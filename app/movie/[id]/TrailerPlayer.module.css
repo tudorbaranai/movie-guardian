@@ -1,0 +1,72 @@
+/* Shared shape, so the still and the real player occupy the exact same box. */
+.facade,
+.frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  /* Only a small rounding: YouTube's controls sit in the very bottom corners,
+     and a big radius clips the play and fullscreen buttons. */
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: #000;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* --------------------------- the click-to-play still --------------------------- */
+
+.facade {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+}
+
+.thumb {
+  object-fit: cover;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, transform 0.35s ease;
+}
+
+.facade:hover .thumb {
+  opacity: 0.95;
+  transform: scale(1.03);
+}
+
+.playIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  /* Nudges the triangle off the circle's optical centre. */
+  padding-left: 5px;
+  border-radius: 50%;
+  background: rgba(var(--bg-rgb), 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 24px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.facade:hover .playIcon {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.playLabel {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}

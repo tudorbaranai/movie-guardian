@@ -1,0 +1,153 @@
+/* The wrapper is what the suggestions list positions itself against, so it
+   owns the width; the form just fills it. */
+.wrap,
+.wrapCompact {
+  position: relative;
+  width: 100%;
+}
+
+.wrap {
+  max-width: 560px;
+}
+
+.wrapCompact {
+  max-width: 340px;
+}
+
+.form {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 50px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.wrapCompact .form {
+  height: 38px;
+}
+
+.form:focus-within {
+  border-color: var(--accent);
+  background: var(--bg-soft);
+}
+
+.icon {
+  position: absolute;
+  left: 15px;
+  width: 17px;
+  height: 17px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  height: 100%;
+  padding: 0 18px 0 42px;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  outline: none;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.wrapCompact .input {
+  font-size: 14px;
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+/* Hide the browser's built-in "clear" X so the box stays clean. */
+.input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+/* ------------------------------ suggestions ------------------------------- */
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  /* Above the sticky header (z-index 50) so it can't be clipped by it. */
+  z-index: 60;
+  padding: 6px;
+  max-height: 430px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 7px 8px;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s ease;
+}
+
+/* One highlight style for BOTH the mouse and the arrow keys, so hovering and
+   pressing ↓ never look like two different things. */
+.itemActive {
+  background: var(--surface-hover);
+}
+
+.thumb {
+  width: 34px;
+  height: 51px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-soft);
+}
+
+.noThumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 51px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  font-size: 15px;
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.itemTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemYear {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.status {
+  padding: 12px;
+  font-size: 13.5px;
+  color: var(--text-faint);
+}

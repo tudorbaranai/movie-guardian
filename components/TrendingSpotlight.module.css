@@ -1,0 +1,280 @@
+.spotlight {
+  margin-bottom: 40px;
+}
+
+/* Edge to edge: the picture spans the whole window, with no rounded corners or
+   side border, because it now touches the sides of the screen.
+   NOTE: `overflow: hidden` crops the backdrop to this box, which also means
+   anything inside that needs to spill OUT of the banner gets cut off. The
+   search bar used to live in here and its suggestions dropdown was clipped
+   (and the hidden options were unclickable) — that's why search is now in the
+   header only. Don't put a popup, dropdown or tooltip inside this box. */
+.stage {
+  position: relative;
+  /* Grows with the window but never gets silly: never under 380px tall, never
+     over 500px, and 44% of the window width in between. */
+  height: clamp(380px, 44vw, 500px);
+  overflow: hidden;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border);
+}
+
+.stageImage {
+  object-fit: cover;
+  /* Faces usually sit in the upper half of a film still. */
+  object-position: center 25%;
+}
+
+/* Two gradients: one from the left so the text has a dark bed, one from the
+   bottom so the picture melts into the page instead of stopping dead. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(var(--bg-rgb), 0.97) 0%,
+      rgba(var(--bg-rgb), 0.82) 38%,
+      rgba(var(--bg-rgb), 0.15) 100%
+    ),
+    linear-gradient(0deg, rgba(var(--bg-rgb), 0.95) 0%, transparent 58%);
+}
+
+/* The picture is full width, but everything you READ is held to the same
+   column as the rest of the site so nothing looks adrift. */
+.inner {
+  position: relative;
+  height: 100%;
+  max-width: var(--page-width);
+  margin: 0 auto;
+}
+
+/* ------------------------------- the film --------------------------------- */
+
+.content {
+  position: absolute;
+  left: 24px;
+  /* `right` is what actually keeps the text clear of the posters. Reserving the
+     space with padding isn't enough: this box sizes itself to its contents, so
+     the words would simply run on underneath them. */
+  right: 452px;
+  bottom: 38px;
+  z-index: 1;
+  max-width: 520px;
+}
+
+.title {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -1.2px;
+  line-height: 1.08;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 12px;
+}
+
+/* `align-items: baseline` sits the big number and the small "/10" on the same
+   invisible writing line, which is what makes it look typeset rather than
+   pasted together. */
+.score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.star {
+  align-self: center;
+  font-size: 23px;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.scoreValue {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.8px;
+  /* Gold, matching the star beside it and the score chip on every poster. */
+  color: var(--gold);
+}
+
+.scoreMax {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.year {
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.overview {
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-dim);
+
+  /* Keep the blurb to three lines so a chatty synopsis can't wreck the layout. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cta {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 11px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.cta:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+/* ------------------------------- the picker ------------------------------- */
+
+.picker {
+  position: absolute;
+  right: 24px;
+  bottom: 38px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+}
+
+.thumb {
+  position: relative;
+  width: 72px;
+  height: 108px;
+  flex-shrink: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  background: var(--surface);
+  opacity: 0.6;
+  transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.thumb:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+.thumbActive {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.thumbImage {
+  object-fit: cover;
+}
+
+.rank {
+  position: absolute;
+  left: 5px;
+  bottom: 1px;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
+}
+
+/* ------------------------------- responsive ------------------------------- */
+
+/* Below this width the posters would eat half the stage if they stayed beside
+   the text, so they drop to their own row and the text gets the full width. */
+@media (max-width: 900px) {
+  .stage {
+    height: 430px;
+  }
+
+  .content {
+    left: 24px;
+    right: 24px;
+    max-width: none;
+    /* Sits above the picker row rather than next to it. */
+    bottom: 118px;
+  }
+
+  .title {
+    font-size: 30px;
+    letter-spacing: -0.8px;
+  }
+
+  .scoreValue {
+    font-size: 27px;
+  }
+
+  .overview {
+    -webkit-line-clamp: 2;
+    font-size: 14px;
+  }
+
+  .picker {
+    left: 24px;
+    right: auto;
+    bottom: 26px;
+    gap: 8px;
+  }
+
+  .thumb {
+    width: 56px;
+    height: 84px;
+  }
+}
+
+@media (max-width: 640px) {
+  .stage {
+    height: 400px;
+  }
+
+  .content {
+    left: 16px;
+    right: 16px;
+    bottom: 100px;
+  }
+
+  .title {
+    font-size: 25px;
+  }
+
+  .scoreValue {
+    font-size: 24px;
+  }
+
+  .star {
+    font-size: 19px;
+  }
+
+  .overview {
+    display: none;
+  }
+
+  .picker {
+    left: 16px;
+    bottom: 22px;
+  }
+
+  .thumb {
+    width: 48px;
+    height: 72px;
+  }
+
+  .rank {
+    font-size: 17px;
+  }
+}

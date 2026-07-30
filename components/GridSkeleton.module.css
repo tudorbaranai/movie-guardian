@@ -1,0 +1,41 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 24px 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.poster {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.line,
+.lineShort {
+  height: 11px;
+  background: var(--surface);
+  border-radius: 4px;
+}
+
+.line {
+  width: 85%;
+}
+
+.lineShort {
+  width: 40%;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 20px 14px;
+  }
+}

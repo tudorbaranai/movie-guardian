@@ -1,0 +1,135 @@
+.box {
+  margin-top: 24px;
+  padding: 16px 18px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--text-dim);
+  max-width: 560px;
+}
+
+.link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.button,
+.active,
+.remove {
+  padding: 9px 17px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 999px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.button {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+}
+
+.button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.active {
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.active:hover {
+  background: var(--accent-hover);
+}
+
+.remove {
+  margin-left: auto;
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.remove:hover {
+  color: var(--danger);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+/* -------------------------------- rating --------------------------------- */
+
+.ratingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.ratingLabel {
+  margin-right: 6px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.ratingButton,
+.ratingActive {
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.ratingButton {
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+}
+
+.ratingButton:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.ratingActive {
+  color: var(--on-bright);
+  background: var(--gold);
+  border: 1px solid var(--gold);
+}
+
+.error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+@media (max-width: 800px) {
+  .box {
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+  }
+
+  .row,
+  .ratingRow {
+    justify-content: center;
+  }
+
+  .remove {
+    margin-left: 0;
+  }
+}

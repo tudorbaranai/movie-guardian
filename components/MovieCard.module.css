@@ -1,0 +1,113 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+.posterWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.card:hover .posterWrap {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+}
+
+.poster {
+  object-fit: cover;
+  transition: filter 0.2s ease;
+}
+
+/* Watched films sink into the background of the grid. */
+.posterSeen {
+  filter: grayscale(0.55) brightness(0.62);
+}
+
+/* Hovering a watched film brings it back, so you can still see it properly. */
+.card:hover .posterSeen {
+  filter: grayscale(0.15) brightness(0.85);
+}
+
+.noPoster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.score {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  color: var(--on-bright);
+  backdrop-filter: blur(4px);
+  /* Always gold now — the score reads as one consistent thing across the site,
+     rather than changing colour with the number. */
+  background: var(--gold);
+}
+
+.userRating {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  color: var(--gold);
+  background: rgba(var(--bg-rgb), 0.85);
+}
+
+/* -------------------------- seen / watchlist marker ----------------------- */
+
+/* A stroke along the very bottom edge of the poster. It sits ON the image but
+   covers none of it, which is why it survives at small grid sizes. */
+.underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 4px;
+}
+
+.underlineSeen {
+  background: var(--seen);
+}
+
+.underlineList {
+  background: var(--watchlist);
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+
+  /* Keep titles to two lines so the grid stays tidy. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.year {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}

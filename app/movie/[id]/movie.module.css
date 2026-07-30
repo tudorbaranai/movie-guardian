@@ -1,0 +1,317 @@
+/* ---------------------------------- hero ---------------------------------- */
+
+.hero {
+  position: relative;
+  padding: 40px 0 44px;
+  margin-bottom: 8px;
+}
+
+/* The wide, faded film still behind the title. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.backdropImage {
+  object-fit: cover;
+  object-position: center 20%;
+  opacity: 0.28;
+}
+
+/* Fades the image into the page background so text stays readable. */
+.backdropFade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(var(--bg-rgb), 0.5) 0%, var(--bg) 96%),
+    linear-gradient(90deg, var(--bg) 0%, rgba(var(--bg-rgb), 0.35) 60%);
+}
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Title, tagline and score — a full-width band above the poster/trailer row. */
+.titleBlock {
+  margin-bottom: 22px;
+}
+
+/* Poster on the left, trailer player right next to it. */
+.mediaRow {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.posterCol {
+  flex-shrink: 0;
+}
+
+.poster {
+  width: 260px;
+  height: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.noPoster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 260px;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 14px;
+}
+
+/* The poster is 260px wide and 2:3 tall, so it lands at 390px high. A 16:9
+   player is exactly 390px high when it's 693px wide — capping the width there
+   makes the video line up perfectly with the bottom of the poster. */
+.trailerCol {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 693px;
+}
+
+.trailerLink {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+
+.trailerLink:hover {
+  color: var(--accent);
+}
+
+.noTrailer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-soft);
+  color: var(--text-faint);
+  font-size: 14px;
+}
+
+.title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -1.3px;
+  line-height: 1.1;
+}
+
+.year {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text-faint);
+  letter-spacing: -0.5px;
+}
+
+.tagline {
+  margin-top: 10px;
+  font-size: 16px;
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.score {
+  padding: 4px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  color: var(--on-bright);
+}
+
+.scoreGood {
+  background: var(--green);
+}
+
+.scoreOk {
+  background: var(--gold);
+}
+
+.scoreBad {
+  background: var(--danger);
+}
+
+.metaItem {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+  list-style: none;
+}
+
+.genre {
+  padding: 5px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+/* --------------------------------- details -------------------------------- */
+
+.section {
+  margin-bottom: 44px;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+  margin-bottom: 14px;
+}
+
+.sectionTitle::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 17px;
+  margin-right: 10px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.overview {
+  max-width: 760px;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+/* ---------------------------------- cast ---------------------------------- */
+
+.castRow {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.castCard {
+  flex: 0 0 118px;
+  width: 118px;
+}
+
+.castPhotoWrap {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 9px;
+}
+
+.castPhoto {
+  object-fit: cover;
+}
+
+.castNoPhoto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.castName {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.castRole {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  line-height: 1.3;
+}
+
+/* ------------------------------- responsive ------------------------------- */
+
+@media (max-width: 800px) {
+  .heroInner {
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Not enough width for side-by-side — stack the poster above the trailer. */
+  .mediaRow {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .trailerCol {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .poster,
+  .noPoster {
+    width: 190px;
+  }
+
+  .title {
+    justify-content: center;
+    font-size: 27px;
+    letter-spacing: -0.8px;
+  }
+
+  .year {
+    font-size: 18px;
+  }
+
+  .metaRow,
+  .genres {
+    justify-content: center;
+  }
+
+  .overview {
+    font-size: 15px;
+  }
+}
