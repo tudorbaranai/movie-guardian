@@ -124,7 +124,7 @@ This file holds secrets and **is gitignored** (never committed / uploaded). It c
 ```
 TMDB_ACCESS_TOKEN=...            # server-only (no NEXT_PUBLIC_ prefix)
 NEXT_PUBLIC_SUPABASE_URL=...     # safe for the browser
-NEXT_PUBLIC_SUPABASE_ANON_KEY=... # safe for the browser (publishable key)
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... # sb_publishable_… — safe for the browser
 ```
 
 The `NEXT_PUBLIC_` prefix tells Next.js a value is allowed in the browser. The TMDB
