@@ -75,7 +75,13 @@ Two features:
   - Signed-in users who open `/login` are sent to the homepage.
   - **Create account asks for the password twice** ("Confirm password"): a red hint appears as
     soon as the second one stops matching, and the account isn't created until they match.
+  - **Forgot password?** on the Sign in tab: enter your email → type the 8-digit code from
+    the "Reset password" email → choose a new password (typed twice) → signed in. The reply
+    after "Send code" never reveals whether an account exists for that email.
   - Auth emails go through **custom SMTP (Gmail)** so the templates can be edited.
+- [x] **QA fixes (Sept 2026):** the results-page search box no longer pops open by itself;
+      crafted `/movie/…` addresses are refused (404); images load straight from TMDB instead of
+      Vercel's optimizer; "Try again" really reloads; search and My Movies show real errors.
 - [x] **Feedback loops (Sept 2026):** Vitest unit tests, TypeScript + ESLint + Prettier checks,
       and a **Husky pre-commit hook** that blocks commits when any of them fail.
 - [ ] Phase 2 — Similar movies (embeddings). Phase 3 — Recommender + quiz. Phase 4 — Social.
@@ -182,8 +188,11 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...  # sb_publishable_… — safe for the 
 **the commit is refused** — fix the cause, never bypass it with `--no-verify`.
 
 **Tests** live in `__tests__/` (Vitest + React Testing Library, set up as in the Next.js
-testing guide). Supabase and `next/navigation` are **mocked** — tests never touch the real
-project, send emails, or create accounts.
+testing guide), in the **same folders as the file they test, minus `app/`** — e.g.
+`components/SearchBar.tsx` → `__tests__/components/SearchBar.test.tsx`. Supabase, `fetch`
+(TMDB), `next/navigation`, `next/image` and `next/link` are **mocked** — tests never touch the
+real project, send emails, or create accounts. Tests of server code start with
+`// @vitest-environment node`.
 
 ---
 
@@ -208,8 +217,11 @@ the GitHub account `tudorbaranai`.
 - **Email + password**, with **email confirmation ON** (Authentication → Sign In / Providers → Email).
 - **Sign-up is confirmed with a code, not a link.** The "Confirm sign up" email template
   (Authentication → Emails → Templates) shows `{{ .Token }}` and has no link.
-- **Email OTP length is 8** — it must match `CODE_LENGTH` in `app/login/VerifyCode.tsx`.
-  Change both together.
+- **Password reset also uses a code.** The "Reset password" template shows `{{ .Token }}` and
+  has no link. "Require current password when updating" must stay **off**, or people who
+  forgot their password couldn't set a new one.
+- **Email OTP length is 8** (for both emails) — it must match `CODE_LENGTH` in
+  `app/login/VerifyCode.tsx`. Change both together.
 - **Custom SMTP = Gmail** (`smtp.gmail.com`, port 465, an App Password). Supabase requires
   custom SMTP before email templates can be edited, and its built-in sender only delivers a
   few emails an hour to team members. Gmail is fine for a few friends; a service like Resend
@@ -273,8 +285,11 @@ movie-guardian/
 │  ├─ error.tsx           # friendly "something went wrong" page
 │  ├─ message.module.css  # shared styles for those two
 │  ├─ login/
-│  │  ├─ page.tsx         # sign-in / create-account card; hands over to the code screen
-│  │  ├─ VerifyCode.tsx   # "Enter your code" screen (8 boxes, paste, resend cooldown)
+│  │  ├─ page.tsx         # sign in / create account; moves between the screens below
+│  │  ├─ VerifyCode.tsx   # "Enter your code" (8 boxes, paste, resend) — sign-up AND reset
+│  │  ├─ ForgotPassword.tsx # "Reset your password": asks for the email
+│  │  ├─ NewPassword.tsx  # "Choose a new password" (after the reset code)
+│  │  ├─ ConfirmPasswordField.tsx # shared "Confirm password" box with live hint
 │  │  └─ login.module.css
 │  ├─ my-movies/
 │  │  ├─ page.tsx         # stats, Seen/Watchlist tabs, sorting
@@ -299,13 +314,13 @@ movie-guardian/
 ├─ lib/
 │  ├─ tmdb.ts             # TMDB (server-side): search, trending, popular, details
 │  └─ supabase.ts         # browser Supabase client (auth + database)
-├─ __tests__/login/       # unit tests for the login page and the code screen
+├─ __tests__/             # unit tests, same folders as the code (login/, lib/, api/…)
 ├─ .husky/pre-commit      # checks that run before every commit
 ├─ .claude/launch.json    # lets Claude Code start the dev server ("movie-site")
 ├─ vitest.config.mts      # test settings (+ vitest.setup.ts)
 ├─ .lintstagedrc.json     # what runs on staged files (ESLint, Prettier)
 ├─ .prettierrc.json       # Prettier (default settings)
-├─ next.config.ts         # allows poster images from image.tmdb.org
+├─ next.config.ts         # images served straight from image.tmdb.org (no Vercel optimizer)
 ├─ AGENTS.md / CLAUDE.md  # instructions for AI coding agents
 ├─ .env.local             # secrets (gitignored)
 ├─ PLAN.md                # full roadmap & design decisions
@@ -363,10 +378,10 @@ is still in `components/` if we want to revisit this later with a real browser.
 ### Where things stand (2026-09-15)
 
 **Phases 0 and 1 are complete, verified, and live** at <https://movie-guardian.vercel.app>:
-search, movie pages, sign-up confirmed with an 8-digit email code, sign in, mark seen /
-watchlist, 1–10 ratings, My Movies. `npm run check` and the production build pass,
-`npm audit` reports 0 vulnerabilities, and a QA pass (desktop + phone, signed out and signed in)
-found only the items in the fix batch below.
+search, movie pages, sign-up confirmed with an 8-digit email code, sign in, forgot password
+(with a code), mark seen / watchlist, 1–10 ratings, My Movies. `npm run check` (49 tests) and
+the production build pass, `npm audit` reports 0 vulnerabilities, and the findings of the QA
+pass (desktop + phone, signed out and signed in) are fixed and live.
 
 ### First steps in a new session
 
@@ -376,31 +391,23 @@ found only the items in the fix batch below.
 
 ### Next steps (in order)
 
-1. **Live sign-up test** on <https://movie-guardian.vercel.app> with a new email alias.
-2. **Supabase URL configuration** (Authentication → URL Configuration):
-   Site URL `https://movie-guardian.vercel.app`; Redirect URLs `http://localhost:3000/**`,
-   `https://movie-guardian.vercel.app/**`, `https://movie-guardian-*-tudorbaranai-5534s-projects.vercel.app/**`.
-   Then delete test accounts (Authentication → Users).
-3. **Fix batch** from the QA/code review (one commit):
-   - the search box on the `/?q=` results page opens its suggestions dropdown by itself on load
-   - `/movie/[id]` must reject non-numeric ids (a crafted id makes the server call other TMDB endpoints with our token)
-   - load images straight from TMDB (every poster currently uses Vercel image optimization — free-plan limit)
-   - `app/error.tsx`: use `retry` instead of `reset` so "Try again" really reloads data (Next 16.3 docs)
-   - show real errors instead of "No matches" / an empty My Movies when TMDB or Supabase fails
-   - add `data-scroll-behavior="smooth"` to `<html>` (Next 16 dev notice)
-4. **Forgot password** with an emailed code (`verifyOtp` type `recovery`), and switch the
-   Supabase "Reset password" template to `{{ .Token }}`.
-5. **Windows PC:** rename the Supabase key in its `.env.local` (see above), then pull + install.
-6. **Custom domain:** the user already owns one — connect it in Vercel, then move auth email
-   from Gmail to a transactional service (e.g. Resend) on that domain.
-7. **Phase 2 — "Similar movies"** (the first machine-learning step):
+Done on 2026-09-15: live sign-up test, QA fix batch, Confirm password, Forgot password
+(tested for real by the user), Supabase URL configuration (Site URL + 3 redirect URLs) and
+test-account cleanup. The Windows PC update was dropped — that PC isn't used for now.
+
+1. **Phase 2 — "Similar movies"** (the first machine-learning step):
    1. A **Python** script (offline) that pulls a catalogue of movies from TMDB into Supabase.
    2. A **local embedding model** (e.g. `sentence-transformers`) turns each film's text
       (overview + genres + cast) into a vector. No paid APIs.
    3. Enable **`pgvector`** in Supabase and store the vectors.
    4. A **"Similar movies"** row on the movie page using nearest-neighbour search — compared
       against TMDB's own "If you liked this" row.
-8. _Later:_ TypeScript 7 and ESLint 10 major upgrades (skipped on purpose for now).
+2. _Later, only when needed:_
+   - **Custom domain + a transactional email service** (e.g. Resend) — worth it once the site
+     is shared beyond a few friends, codes start landing in spam, or Gmail's daily sending
+     limit gets close. Not needed during early development.
+   - A **"change password"** option for signed-in users (the reset flow only covers forgotten ones).
+   - TypeScript 7 and ESLint 10 major upgrades (skipped on purpose for now).
 
 ### Gotchas that have already bitten us
 
