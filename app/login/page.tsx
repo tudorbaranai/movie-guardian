@@ -1,9 +1,10 @@
 "use client";
 
 // Runs in the browser so it can hold what you type and react to clicks.
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import VerifyCode from "./VerifyCode";
 import styles from "./login.module.css";
 
 type Mode = "signin" | "signup";
@@ -17,6 +18,27 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(false);
+  // True until we know whether someone is already signed in, so the form
+  // doesn't flash on screen right before we send them away.
+  const [checking, setChecking] = useState(true);
+  // Set once we're waiting for someone to type the code we emailed them.
+  // While it's set, the code screen replaces the form.
+  const [codeEmail, setCodeEmail] = useState<string | null>(null);
+  const [codeNotice, setCodeNotice] = useState<string | null>(null);
+
+  // Already signed in? There's nothing to do on this page, so go home.
+  // `replace` (not `push`) so the Back button doesn't return you here.
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      if (data.user) router.replace("/");
+      else setChecking(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -26,14 +48,30 @@ export default function LoginPage() {
 
     if (mode === "signin") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      setLoading(false);
 
+      if (error?.code === "email_not_confirmed") {
+        // They created an account but never entered the code (closed the tab,
+        // lost the email…). Send a fresh code and take them straight to it.
+        const { error: resendError } = await supabase.auth.resend({
+          type: "signup",
+          email,
+        });
+        setLoading(false);
+        setCodeNotice(
+          resendError
+            ? "Your email isn't confirmed yet. Enter the code from your latest email."
+            : "Your email isn't confirmed yet, so we sent you a new code.",
+        );
+        setCodeEmail(email);
+        return;
+      }
+
+      setLoading(false);
       if (error) {
         setMessage(error.message);
         setIsError(true);
       } else {
-        router.push("/");
-        router.refresh();
+        goHome();
       }
       return;
     }
@@ -51,12 +89,47 @@ export default function LoginPage() {
       setMessage(error.message);
       setIsError(true);
     } else if (data.session) {
-      // Email confirmation is off, so we're signed in straight away.
-      router.push("/");
-      router.refresh();
+      // Email confirmation is off in Supabase, so we're signed in straight away.
+      goHome();
+    } else if (data.user?.identities?.length === 0) {
+      // Supabase's way of saying "this email already has a confirmed account":
+      // it sends no code, so don't leave them waiting for one.
+      setMode("signin");
+      setMessage("There's already an account with this email. Sign in instead.");
+      setIsError(true);
     } else {
-      setMessage("Account created! Check your email to confirm, then sign in.");
+      // Supabase has emailed a code. Swap the form for the code screen.
+      setCodeNotice(null);
+      setCodeEmail(email);
     }
+  }
+
+  function goHome() {
+    router.push("/");
+    router.refresh();
+  }
+
+  if (checking) {
+    return <main className={styles.main} />;
+  }
+
+  if (codeEmail) {
+    return (
+      <main className={styles.main}>
+        <VerifyCode
+          email={codeEmail}
+          initialNotice={codeNotice}
+          onVerified={goHome}
+          onBack={() => {
+            setCodeEmail(null);
+            setCodeNotice(null);
+            setPassword("");
+            setMessage(null);
+            setMode("signup");
+          }}
+        />
+      </main>
+    );
   }
 
   return (
