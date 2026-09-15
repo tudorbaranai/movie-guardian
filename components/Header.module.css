@@ -172,7 +172,9 @@
   font-weight: 600;
   color: var(--text-dim);
   border-radius: var(--radius-sm);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .menuItem:hover {

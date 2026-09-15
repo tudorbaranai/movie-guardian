@@ -60,7 +60,9 @@ export default function MyMoviesPage() {
   const rated = seen.filter((r) => r.rating != null);
   const average =
     rated.length > 0
-      ? (rated.reduce((sum, r) => sum + (r.rating ?? 0), 0) / rated.length).toFixed(1)
+      ? (
+          rated.reduce((sum, r) => sum + (r.rating ?? 0), 0) / rated.length
+        ).toFixed(1)
       : null;
 
   const visible = useMemo(() => {
@@ -105,7 +107,11 @@ export default function MyMoviesPage() {
         <div className={styles.stats}>
           <Stat value={seen.length} label="watched" />
           <Stat value={watchlist.length} label="to watch" />
-          <Stat value={average ?? "—"} label="avg rating" highlight={!!average} />
+          <Stat
+            value={average ?? "—"}
+            label="avg rating"
+            highlight={!!average}
+          />
         </div>
       </div>
 
@@ -125,7 +131,8 @@ export default function MyMoviesPage() {
             className={tab === "watchlist" ? styles.tabActive : styles.tab}
             onClick={() => setTab("watchlist")}
           >
-            Watchlist <span className={styles.tabCount}>{watchlist.length}</span>
+            Watchlist{" "}
+            <span className={styles.tabCount}>{watchlist.length}</span>
           </button>
         </div>
 

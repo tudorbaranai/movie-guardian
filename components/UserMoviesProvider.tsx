@@ -48,7 +48,9 @@ async function fetchMarks(): Promise<Marks> {
 
   // No "where user_id = me" needed — the database's Row-Level Security rules
   // physically cannot return anyone else's rows.
-  const { data } = await supabase.from("user_movies").select("movie_id, status");
+  const { data } = await supabase
+    .from("user_movies")
+    .select("movie_id, status");
 
   const marks: Marks = {};
   for (const row of data ?? []) {

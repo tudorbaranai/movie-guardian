@@ -71,7 +71,9 @@ export default function TrendingSpotlight({
                   <span className={styles.scoreMax}>/10</span>
                 </span>
               )}
-              {active.year && <span className={styles.year}>{active.year}</span>}
+              {active.year && (
+                <span className={styles.year}>{active.year}</span>
+              )}
             </div>
 
             {active.overview && (

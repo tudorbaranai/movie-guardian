@@ -47,7 +47,10 @@ export default function LoginPage() {
     setIsError(false);
 
     if (mode === "signin") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (error?.code === "email_not_confirmed") {
         // They created an account but never entered the code (closed the tab,
@@ -95,7 +98,9 @@ export default function LoginPage() {
       // Supabase's way of saying "this email already has a confirmed account":
       // it sends no code, so don't leave them waiting for one.
       setMode("signin");
-      setMessage("There's already an account with this email. Sign in instead.");
+      setMessage(
+        "There's already an account with this email. Sign in instead.",
+      );
       setIsError(true);
     } else {
       // Supabase has emailed a code. Swap the form for the code screen.
@@ -209,7 +214,9 @@ export default function LoginPage() {
               placeholder="At least 6 characters"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              autoComplete={
+                mode === "signin" ? "current-password" : "new-password"
+              }
               required
               minLength={6}
             />

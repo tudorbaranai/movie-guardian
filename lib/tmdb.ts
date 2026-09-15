@@ -49,14 +49,17 @@ export type MovieDetails = Movie & {
 // One shared place to make a TMDB request, so every function below stays short.
 async function tmdbFetch<T>(path: string): Promise<T | null> {
   const separator = path.includes("?") ? "&" : "?";
-  const response = await fetch(`${TMDB_BASE_URL}${path}${separator}language=en-US`, {
-    headers: {
-      Authorization: `Bearer ${process.env.TMDB_ACCESS_TOKEN}`,
-      accept: "application/json",
+  const response = await fetch(
+    `${TMDB_BASE_URL}${path}${separator}language=en-US`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.TMDB_ACCESS_TOKEN}`,
+        accept: "application/json",
+      },
+      // Remember the answer for an hour: instant repeats, and kind to TMDB.
+      next: { revalidate: 3600 },
     },
-    // Remember the answer for an hour: instant repeats, and kind to TMDB.
-    next: { revalidate: 3600 },
-  });
+  );
 
   if (response.status === 404) return null;
   if (!response.ok) {
@@ -67,11 +70,17 @@ async function tmdbFetch<T>(path: string): Promise<T | null> {
 }
 
 // Build image URLs. TMDB serves several widths; we pick one per use case.
-export function posterUrl(path: string | null, size: "w185" | "w342" | "w500" = "w342") {
+export function posterUrl(
+  path: string | null,
+  size: "w185" | "w342" | "w500" = "w342",
+) {
   return path ? `${IMAGE_BASE_URL}/${size}${path}` : null;
 }
 
-export function backdropUrl(path: string | null, size: "w780" | "w1280" = "w1280") {
+export function backdropUrl(
+  path: string | null,
+  size: "w780" | "w1280" = "w1280",
+) {
   return path ? `${IMAGE_BASE_URL}/${size}${path}` : null;
 }
 
@@ -112,7 +121,9 @@ export async function getPopular(): Promise<Movie[]> {
 }
 
 // One request that also brings back cast, trailers and recommendations.
-export async function getMovie(id: string | number): Promise<MovieDetails | null> {
+export async function getMovie(
+  id: string | number,
+): Promise<MovieDetails | null> {
   return tmdbFetch<MovieDetails>(
     `/movie/${id}?append_to_response=credits,videos,recommendations`,
   );

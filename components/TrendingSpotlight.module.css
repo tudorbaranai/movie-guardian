@@ -135,7 +135,9 @@
   color: #fff;
   background: var(--accent);
   border-radius: 999px;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
 }
 
 .cta:hover {
@@ -165,7 +167,10 @@
   border: 2px solid transparent;
   background: var(--surface);
   opacity: 0.6;
-  transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .thumb:hover {

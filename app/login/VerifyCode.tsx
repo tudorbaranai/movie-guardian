@@ -114,7 +114,9 @@ export default function VerifyCode({
       boxes.current[CODE_LENGTH - 1]?.blur();
       verify(next.join(""));
     } else {
-      boxes.current[Math.min(start + incoming.length, CODE_LENGTH - 1)]?.focus();
+      boxes.current[
+        Math.min(start + incoming.length, CODE_LENGTH - 1)
+      ]?.focus();
     }
   }
 
@@ -130,11 +132,18 @@ export default function VerifyCode({
     // keep only the new one. Anything longer is a pasted or autofilled code.
     const previous = digits[index];
     const typed =
-      previous && raw.length === 2 ? (raw[0] === previous ? raw[1] : raw[0]) : raw;
+      previous && raw.length === 2
+        ? raw[0] === previous
+          ? raw[1]
+          : raw[0]
+        : raw;
     fill(index, typed);
   }
 
-  function handleKeyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(
+    index: number,
+    event: KeyboardEvent<HTMLInputElement>,
+  ) {
     if (event.key === "Backspace" && !digits[index] && index > 0) {
       // Empty box: step back and clear the previous one, like a normal field.
       event.preventDefault();

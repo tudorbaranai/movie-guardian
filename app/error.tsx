@@ -10,8 +10,8 @@ export default function Error({ reset }: { error: Error; reset: () => void }) {
       <p className={styles.emoji}>🎬</p>
       <h1 className={styles.title}>Something went wrong</h1>
       <p className={styles.text}>
-        We couldn&apos;t load that just now. This is usually temporary — please try
-        again.
+        We couldn&apos;t load that just now. This is usually temporary — please
+        try again.
       </p>
       <button className={styles.cta} onClick={reset}>
         Try again

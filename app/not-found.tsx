@@ -8,8 +8,8 @@ export default function NotFound() {
       <p className={styles.emoji}>🎞️</p>
       <h1 className={styles.title}>We couldn&apos;t find that one</h1>
       <p className={styles.text}>
-        The page or film you&apos;re looking for doesn&apos;t exist — it may have been
-        removed, or the link might be wrong.
+        The page or film you&apos;re looking for doesn&apos;t exist — it may
+        have been removed, or the link might be wrong.
       </p>
       <Link href="/" className={styles.cta}>
         Back to home

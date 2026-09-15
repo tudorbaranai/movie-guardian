@@ -1,6 +1,12 @@
 // Tests for the "Enter your code" screen (app/login/VerifyCode.tsx).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // A stand-in for Supabase, so tests never talk to the real project.
@@ -14,7 +20,10 @@ import VerifyCode, { CODE_LENGTH } from "@/app/login/VerifyCode";
 const auth = vi.mocked(supabase.auth);
 const EMAIL = "reader@example.com";
 // "12345678" for 8 digits — built from CODE_LENGTH so the tests follow it.
-const FULL_CODE = Array.from({ length: CODE_LENGTH }, (_, i) => (i + 1) % 10).join("");
+const FULL_CODE = Array.from(
+  { length: CODE_LENGTH },
+  (_, i) => (i + 1) % 10,
+).join("");
 
 function renderScreen() {
   const onVerified = vi.fn();
@@ -23,8 +32,12 @@ function renderScreen() {
   return { onVerified, onBack };
 }
 
-const boxes = () => screen.getAllByLabelText(/^Digit \d+ of/) as HTMLInputElement[];
-const typedCode = () => boxes().map((box) => box.value).join("");
+const boxes = () =>
+  screen.getAllByLabelText(/^Digit \d+ of/) as HTMLInputElement[];
+const typedCode = () =>
+  boxes()
+    .map((box) => box.value)
+    .join("");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -70,7 +83,9 @@ describe("VerifyCode", () => {
     await user.keyboard("12");
     await user.click(screen.getByRole("button", { name: "Confirm email" }));
 
-    expect(screen.getByRole("alert").textContent).toMatch(`Enter all ${CODE_LENGTH} digits`);
+    expect(screen.getByRole("alert").textContent).toMatch(
+      `Enter all ${CODE_LENGTH} digits`,
+    );
     expect(auth.verifyOtp).not.toHaveBeenCalled();
   });
 
@@ -93,14 +108,19 @@ describe("VerifyCode", () => {
   it("a wrong code shows an error, clears the boxes and returns to the first box", async () => {
     auth.verifyOtp.mockResolvedValue({
       data: {},
-      error: { code: "otp_expired", message: "Token has expired or is invalid" },
+      error: {
+        code: "otp_expired",
+        message: "Token has expired or is invalid",
+      },
     } as never);
     const user = userEvent.setup();
     const { onVerified } = renderScreen();
 
     await user.paste(FULL_CODE);
 
-    expect((await screen.findByRole("alert")).textContent).toMatch(/wrong or has expired/);
+    expect((await screen.findByRole("alert")).textContent).toMatch(
+      /wrong or has expired/,
+    );
     expect(typedCode()).toBe("");
     await waitFor(() => expect(document.activeElement).toBe(boxes()[0]));
     expect(onVerified).not.toHaveBeenCalled();
@@ -112,7 +132,9 @@ describe("VerifyCode", () => {
     renderScreen();
 
     expect(screen.getByText("Send a new code in 1:00")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Send a new code" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Send a new code" }),
+    ).toBeNull();
 
     // The countdown ticks once a second; let a minute pass.
     for (let second = 0; second < 60; second++) {
@@ -121,7 +143,9 @@ describe("VerifyCode", () => {
       });
     }
 
-    const resendButton = screen.getByRole("button", { name: "Send a new code" });
+    const resendButton = screen.getByRole("button", {
+      name: "Send a new code",
+    });
     await act(async () => {
       fireEvent.click(resendButton);
     });
@@ -135,7 +159,9 @@ describe("VerifyCode", () => {
     const user = userEvent.setup();
     const { onBack } = renderScreen();
 
-    await user.click(screen.getByRole("button", { name: "Use a different email" }));
+    await user.click(
+      screen.getByRole("button", { name: "Use a different email" }),
+    );
 
     expect(onBack).toHaveBeenCalledTimes(1);
   });

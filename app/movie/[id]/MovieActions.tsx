@@ -133,7 +133,9 @@ export default function MovieActions({ movieId, title, posterPath }: Props) {
           ✓ Seen
         </button>
         <button
-          className={entry?.status === "watchlist" ? styles.active : styles.button}
+          className={
+            entry?.status === "watchlist" ? styles.active : styles.button
+          }
           onClick={() => save("watchlist", null)}
         >
           + Watchlist

@@ -24,7 +24,9 @@
 .thumb {
   object-fit: cover;
   opacity: 0.75;
-  transition: opacity 0.2s ease, transform 0.35s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.35s ease;
 }
 
 .facade:hover .thumb {
@@ -50,7 +52,9 @@
   backdrop-filter: blur(4px);
   color: #fff;
   font-size: 24px;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .facade:hover .playIcon {

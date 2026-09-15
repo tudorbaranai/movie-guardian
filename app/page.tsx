@@ -49,8 +49,8 @@ export default async function Home({
 
         {results.length === 0 ? (
           <p className={styles.empty}>
-            Nothing matched that. Try a different spelling, or search for part of
-            the title.
+            Nothing matched that. Try a different spelling, or search for part
+            of the title.
           </p>
         ) : (
           <MovieGrid>
