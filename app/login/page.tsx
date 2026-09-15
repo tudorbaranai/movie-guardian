@@ -1,7 +1,7 @@
 "use client";
 
 // Runs in the browser so it can hold what you type and react to clicks.
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import VerifyCode from "./VerifyCode";
@@ -15,6 +15,9 @@ export default function LoginPage() {
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Sign-up only: the password typed a second time, to catch typos.
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const confirmRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -40,8 +43,31 @@ export default function LoginPage() {
     };
   }, [router]);
 
+  // True as soon as the confirmation can no longer match — e.g. "abx" when the
+  // password is "abcdef" — but not while it's still a correct beginning.
+  const passwordsDiverge =
+    mode === "signup" &&
+    confirmPassword !== "" &&
+    !password.startsWith(confirmPassword);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setMessage(null);
+    setConfirmPassword("");
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setMessage(
+        "Passwords don't match. Type the same password in both fields.",
+      );
+      setIsError(true);
+      confirmRef.current?.focus();
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
     setIsError(false);
@@ -129,8 +155,7 @@ export default function LoginPage() {
             setCodeEmail(null);
             setCodeNotice(null);
             setPassword("");
-            setMessage(null);
-            setMode("signup");
+            switchMode("signup");
           }}
         />
       </main>
@@ -155,10 +180,7 @@ export default function LoginPage() {
             role="tab"
             aria-selected={mode === "signin"}
             className={mode === "signin" ? styles.switchActive : styles.switch}
-            onClick={() => {
-              setMode("signin");
-              setMessage(null);
-            }}
+            onClick={() => switchMode("signin")}
           >
             Sign in
           </button>
@@ -166,10 +188,7 @@ export default function LoginPage() {
             role="tab"
             aria-selected={mode === "signup"}
             className={mode === "signup" ? styles.switchActive : styles.switch}
-            onClick={() => {
-              setMode("signup");
-              setMessage(null);
-            }}
+            onClick={() => switchMode("signup")}
           >
             Create account
           </button>
@@ -221,6 +240,38 @@ export default function LoginPage() {
               minLength={6}
             />
           </label>
+
+          {/* Only asked for when creating an account. */}
+          {mode === "signup" && (
+            // A <div>, not a wrapping <label>: the hint below must not become
+            // part of the field's name that screen readers announce.
+            <div className={styles.field}>
+              <label htmlFor="confirm-password" className={styles.label}>
+                Confirm password
+              </label>
+              <input
+                id="confirm-password"
+                ref={confirmRef}
+                className={styles.input}
+                type="password"
+                placeholder="Type the same password again"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                required
+                minLength={6}
+                aria-invalid={passwordsDiverge}
+                aria-describedby={
+                  passwordsDiverge ? "confirm-password-hint" : undefined
+                }
+              />
+              {passwordsDiverge && (
+                <span id="confirm-password-hint" className={styles.fieldError}>
+                  Doesn&apos;t match the password above
+                </span>
+              )}
+            </div>
+          )}
 
           <button className={styles.submit} type="submit" disabled={loading}>
             {loading

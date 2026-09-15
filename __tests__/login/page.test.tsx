@@ -98,6 +98,7 @@ describe("LoginPage", () => {
       Nickname: "  Reader  ",
       Email: EMAIL,
       Password: PASSWORD,
+      "Confirm password": PASSWORD,
     });
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
@@ -110,6 +111,60 @@ describe("LoginPage", () => {
       await screen.findByRole("heading", { name: "Enter your code" }),
     ).toBeTruthy();
     expect(screen.getByText(EMAIL)).toBeTruthy();
+  });
+
+  it("only asks to confirm the password when creating an account", async () => {
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await screen.findByRole("heading", { name: "Welcome back" });
+    expect(screen.queryByLabelText("Confirm password")).toBeNull();
+
+    await user.click(screen.getByRole("tab", { name: "Create account" }));
+    expect(screen.getByLabelText("Confirm password")).toBeTruthy();
+  });
+
+  it("won't create the account when the two passwords differ", async () => {
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "Create account" }),
+    );
+    await fillIn(user, {
+      Nickname: "Reader",
+      Email: EMAIL,
+      Password: PASSWORD,
+      "Confirm password": `${PASSWORD}x`,
+    });
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(screen.getByText(/Passwords don't match/)).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByLabelText("Confirm password"),
+    );
+    expect(auth.signUp).not.toHaveBeenCalled();
+  });
+
+  it("warns as soon as the confirmation stops matching, not before", async () => {
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "Create account" }),
+    );
+    await fillIn(user, { Password: "abcdef" });
+    const confirm = screen.getByLabelText("Confirm password");
+
+    // A correct beginning isn't an error yet…
+    await user.type(confirm, "abc");
+    expect(screen.queryByText("Doesn't match the password above")).toBeNull();
+    expect(confirm.getAttribute("aria-invalid")).toBe("false");
+
+    // …but a wrong character is.
+    await user.type(confirm, "x");
+    expect(screen.getByText("Doesn't match the password above")).toBeTruthy();
+    expect(confirm.getAttribute("aria-invalid")).toBe("true");
   });
 
   it("points to Sign in when the email already has an account", async () => {
@@ -128,6 +183,7 @@ describe("LoginPage", () => {
       Nickname: "Reader",
       Email: EMAIL,
       Password: PASSWORD,
+      "Confirm password": PASSWORD,
     });
     await user.click(screen.getByRole("button", { name: "Create account" }));
 

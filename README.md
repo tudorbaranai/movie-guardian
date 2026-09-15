@@ -73,6 +73,8 @@ Two features:
   - Signing in with an unconfirmed email sends a fresh code and opens that screen.
   - Signing up with an email that already has an account points you to Sign in.
   - Signed-in users who open `/login` are sent to the homepage.
+  - **Create account asks for the password twice** ("Confirm password"): a red hint appears as
+    soon as the second one stops matching, and the account isn't created until they match.
   - Auth emails go through **custom SMTP (Gmail)** so the templates can be edited.
 - [x] **Feedback loops (Sept 2026):** Vitest unit tests, TypeScript + ESLint + Prettier checks,
       and a **Husky pre-commit hook** that blocks commits when any of them fail.
