@@ -251,7 +251,8 @@ export default function VerifyCode({
         Didn&apos;t get it?{" "}
         {cooldown > 0 ? (
           <span className={styles.countdown}>
-            Send a new code in 0:{String(cooldown).padStart(2, "0")}
+            Send a new code in {Math.floor(cooldown / 60)}:
+            {String(cooldown % 60).padStart(2, "0")}
           </span>
         ) : (
           <button type="button" className={styles.linkButton} onClick={resend}>
