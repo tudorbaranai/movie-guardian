@@ -1,16 +1,32 @@
 "use client";
 
 // Runs in the browser so it can hold what you type and react to clicks.
+//
+// The login page is a short series of screens ("steps"):
+//
+//   form ─ Create account ─▶ code (signup) ─────────────────────────▶ homepage
+//   form ─ Forgot password? ─▶ forgot ─▶ code (recovery) ─▶ new password ─▶ homepage
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import VerifyCode from "./VerifyCode";
+import ConfirmPasswordField from "./ConfirmPasswordField";
+import ForgotPassword from "./ForgotPassword";
+import NewPassword from "./NewPassword";
+import VerifyCode, { type CodePurpose } from "./VerifyCode";
 import styles from "./login.module.css";
 
 type Mode = "signin" | "signup";
 
+// Which screen is showing. Anything but "form" replaces the whole card.
+type Step =
+  | { name: "form" }
+  | { name: "code"; purpose: CodePurpose; email: string; notice: string | null }
+  | { name: "forgot" }
+  | { name: "new-password"; email: string };
+
 export default function LoginPage() {
   const router = useRouter();
+  const [step, setStep] = useState<Step>({ name: "form" });
   const [mode, setMode] = useState<Mode>("signin");
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
@@ -24,10 +40,6 @@ export default function LoginPage() {
   // True until we know whether someone is already signed in, so the form
   // doesn't flash on screen right before we send them away.
   const [checking, setChecking] = useState(true);
-  // Set once we're waiting for someone to type the code we emailed them.
-  // While it's set, the code screen replaces the form.
-  const [codeEmail, setCodeEmail] = useState<string | null>(null);
-  const [codeNotice, setCodeNotice] = useState<string | null>(null);
 
   // Already signed in? There's nothing to do on this page, so go home.
   // `replace` (not `push`) so the Back button doesn't return you here.
@@ -42,13 +54,6 @@ export default function LoginPage() {
       active = false;
     };
   }, [router]);
-
-  // True as soon as the confirmation can no longer match — e.g. "abx" when the
-  // password is "abcdef" — but not while it's still a correct beginning.
-  const passwordsDiverge =
-    mode === "signup" &&
-    confirmPassword !== "" &&
-    !password.startsWith(confirmPassword);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -86,12 +91,14 @@ export default function LoginPage() {
           email,
         });
         setLoading(false);
-        setCodeNotice(
-          resendError
+        setStep({
+          name: "code",
+          purpose: "signup",
+          email,
+          notice: resendError
             ? "Your email isn't confirmed yet. Enter the code from your latest email."
             : "Your email isn't confirmed yet, so we sent you a new code.",
-        );
-        setCodeEmail(email);
+        });
         return;
       }
 
@@ -130,8 +137,7 @@ export default function LoginPage() {
       setIsError(true);
     } else {
       // Supabase has emailed a code. Swap the form for the code screen.
-      setCodeNotice(null);
-      setCodeEmail(email);
+      setStep({ name: "code", purpose: "signup", email, notice: null });
     }
   }
 
@@ -144,20 +150,61 @@ export default function LoginPage() {
     return <main className={styles.main} />;
   }
 
-  if (codeEmail) {
+  if (step.name === "forgot") {
+    return (
+      <main className={styles.main}>
+        <ForgotPassword
+          initialEmail={email}
+          onCodeSent={(address) => {
+            setEmail(address);
+            setStep({
+              name: "code",
+              purpose: "recovery",
+              email: address,
+              // Deliberately vague: we don't reveal whether the account exists.
+              notice:
+                "If there's an account for this email, we've sent it a code. Nothing after a minute? Check it's the email you signed up with.",
+            });
+          }}
+          onBack={() => setStep({ name: "form" })}
+        />
+      </main>
+    );
+  }
+
+  if (step.name === "code") {
+    const { purpose } = step;
     return (
       <main className={styles.main}>
         <VerifyCode
-          email={codeEmail}
-          initialNotice={codeNotice}
-          onVerified={goHome}
+          // A new key starts the screen fresh (empty boxes, new countdown).
+          key={`${purpose}:${step.email}`}
+          email={step.email}
+          purpose={purpose}
+          initialNotice={step.notice}
+          onVerified={() =>
+            purpose === "recovery"
+              ? setStep({ name: "new-password", email: step.email })
+              : goHome()
+          }
           onBack={() => {
-            setCodeEmail(null);
-            setCodeNotice(null);
+            if (purpose === "recovery") {
+              setStep({ name: "forgot" });
+              return;
+            }
             setPassword("");
             switchMode("signup");
+            setStep({ name: "form" });
           }}
         />
+      </main>
+    );
+  }
+
+  if (step.name === "new-password") {
+    return (
+      <main className={styles.main}>
+        <NewPassword email={step.email} onDone={goHome} />
       </main>
     );
   }
@@ -241,36 +288,27 @@ export default function LoginPage() {
             />
           </label>
 
+          {mode === "signin" && (
+            <button
+              type="button"
+              className={styles.forgotLink}
+              onClick={() => {
+                setMessage(null);
+                setStep({ name: "forgot" });
+              }}
+            >
+              Forgot password?
+            </button>
+          )}
+
           {/* Only asked for when creating an account. */}
           {mode === "signup" && (
-            // A <div>, not a wrapping <label>: the hint below must not become
-            // part of the field's name that screen readers announce.
-            <div className={styles.field}>
-              <label htmlFor="confirm-password" className={styles.label}>
-                Confirm password
-              </label>
-              <input
-                id="confirm-password"
-                ref={confirmRef}
-                className={styles.input}
-                type="password"
-                placeholder="Type the same password again"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                autoComplete="new-password"
-                required
-                minLength={6}
-                aria-invalid={passwordsDiverge}
-                aria-describedby={
-                  passwordsDiverge ? "confirm-password-hint" : undefined
-                }
-              />
-              {passwordsDiverge && (
-                <span id="confirm-password-hint" className={styles.fieldError}>
-                  Doesn&apos;t match the password above
-                </span>
-              )}
-            </div>
+            <ConfirmPasswordField
+              password={password}
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              inputRef={confirmRef}
+            />
           )}
 
           <button className={styles.submit} type="submit" disabled={loading}>

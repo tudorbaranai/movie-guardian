@@ -11,11 +11,20 @@ import userEvent from "@testing-library/user-event";
 
 // A stand-in for Supabase, so tests never talk to the real project.
 vi.mock("@/lib/supabase", () => ({
-  supabase: { auth: { verifyOtp: vi.fn(), resend: vi.fn() } },
+  supabase: {
+    auth: {
+      verifyOtp: vi.fn(),
+      resend: vi.fn(),
+      resetPasswordForEmail: vi.fn(),
+    },
+  },
 }));
 
 import { supabase } from "@/lib/supabase";
-import VerifyCode, { CODE_LENGTH } from "@/app/login/VerifyCode";
+import VerifyCode, {
+  CODE_LENGTH,
+  type CodePurpose,
+} from "@/app/login/VerifyCode";
 
 const auth = vi.mocked(supabase.auth);
 const EMAIL = "reader@example.com";
@@ -25,11 +34,27 @@ const FULL_CODE = Array.from(
   (_, i) => (i + 1) % 10,
 ).join("");
 
-function renderScreen() {
+function renderScreen(purpose: CodePurpose = "signup") {
   const onVerified = vi.fn();
   const onBack = vi.fn();
-  render(<VerifyCode email={EMAIL} onVerified={onVerified} onBack={onBack} />);
+  render(
+    <VerifyCode
+      email={EMAIL}
+      purpose={purpose}
+      onVerified={onVerified}
+      onBack={onBack}
+    />,
+  );
   return { onVerified, onBack };
+}
+
+// Let the resend countdown run out (it ticks once a second, for a minute).
+function waitOutCooldown() {
+  for (let second = 0; second < 60; second++) {
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+  }
 }
 
 const boxes = () =>
@@ -136,12 +161,7 @@ describe("VerifyCode", () => {
       screen.queryByRole("button", { name: "Send a new code" }),
     ).toBeNull();
 
-    // The countdown ticks once a second; let a minute pass.
-    for (let second = 0; second < 60; second++) {
-      act(() => {
-        vi.advanceTimersByTime(1000);
-      });
-    }
+    waitOutCooldown();
 
     const resendButton = screen.getByRole("button", {
       name: "Send a new code",
@@ -151,8 +171,49 @@ describe("VerifyCode", () => {
     });
 
     expect(auth.resend).toHaveBeenCalledWith({ type: "signup", email: EMAIL });
+    expect(auth.resetPasswordForEmail).not.toHaveBeenCalled();
     expect(screen.getByRole("status").textContent).toMatch(/New code sent/);
     expect(screen.getByText("Send a new code in 1:00")).toBeTruthy();
+  });
+
+  describe("for a password reset", () => {
+    it("checks the code as a recovery code", async () => {
+      auth.verifyOtp.mockResolvedValue({ data: {}, error: null } as never);
+      const user = userEvent.setup();
+      const { onVerified } = renderScreen("recovery");
+
+      await user.paste(FULL_CODE);
+
+      expect(auth.verifyOtp).toHaveBeenCalledWith({
+        email: EMAIL,
+        token: FULL_CODE,
+        type: "recovery",
+      });
+      await waitFor(() => expect(onVerified).toHaveBeenCalledTimes(1));
+    });
+
+    it("sends a new code by requesting another password reset", async () => {
+      vi.useFakeTimers();
+      auth.resetPasswordForEmail.mockResolvedValue({
+        data: {},
+        error: null,
+      } as never);
+      renderScreen("recovery");
+
+      waitOutCooldown();
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "Send a new code" }),
+        );
+      });
+
+      expect(auth.resetPasswordForEmail).toHaveBeenCalledWith(EMAIL);
+      expect(auth.resend).not.toHaveBeenCalled();
+      // Never promises an email: Supabase says "OK" even for unknown emails.
+      const notice = screen.getByRole("status").textContent;
+      expect(notice).toMatch(/If there's an account for this email/);
+      expect(notice).not.toMatch(/New code sent/);
+    });
   });
 
   it("'Use a different email' goes back", async () => {

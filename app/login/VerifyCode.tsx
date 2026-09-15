@@ -1,10 +1,12 @@
 "use client";
 
-// The "Enter your code" screen, shown right after creating an account.
+// The "Enter your code" screen, used for two jobs:
+// - "signup":   right after creating an account, to confirm the email
+// - "recovery": after "Forgot password?", to prove the email is yours
 //
-// Supabase emails a short numeric code (see the "Confirm sign up" email
-// template in the Supabase dashboard). Typing it here confirms the email AND
-// signs you in, all on this page — no link to click, no second browser tab.
+// Supabase emails a short numeric code (see the "Confirm sign up" and "Reset
+// password" email templates in the Supabase dashboard). Typing it here signs
+// you in, all on this page — no link to click, no second browser tab.
 import {
   useEffect,
   useRef,
@@ -27,8 +29,12 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 const emptyCode = () => Array<string>(CODE_LENGTH).fill("");
 
+export type CodePurpose = "signup" | "recovery";
+
 type Props = {
   email: string;
+  /** Which email the code came from — decides how it's checked and resent. */
+  purpose: CodePurpose;
   /** A message to show when the screen opens, e.g. "We sent you a new code". */
   initialNotice?: string | null;
   onVerified: () => void;
@@ -37,6 +43,7 @@ type Props = {
 
 export default function VerifyCode({
   email,
+  purpose,
   initialNotice = null,
   onVerified,
   onBack,
@@ -75,11 +82,12 @@ export default function VerifyCode({
     setError(null);
     setNotice(null);
 
-    // type "email" = "a code that was emailed for sign-up or sign-in".
+    // type "email" = a code emailed for sign-up or sign-in;
+    // type "recovery" = a code from the "Reset password" email.
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email,
       token: code,
-      type: "email",
+      type: purpose === "recovery" ? "recovery" : "email",
     });
 
     if (verifyError) {
@@ -181,10 +189,12 @@ export default function VerifyCode({
     setError(null);
     setNotice(null);
 
-    const { error: resendError } = await supabase.auth.resend({
-      type: "signup",
-      email,
-    });
+    // Supabase's `resend` only covers sign-up emails; a new reset code is
+    // simply another "reset password" request.
+    const { error: resendError } =
+      purpose === "recovery"
+        ? await supabase.auth.resetPasswordForEmail(email)
+        : await supabase.auth.resend({ type: "signup", email });
 
     if (resendError) {
       setError(
@@ -195,7 +205,13 @@ export default function VerifyCode({
       return;
     }
 
-    setNotice("New code sent. Check your inbox, and your spam folder too.");
+    setNotice(
+      purpose === "recovery"
+        ? // Supabase says "OK" even when no account uses this email (so nobody
+          // can test which emails have accounts) — so don't promise an email.
+          "If there's an account for this email, a new code is on its way. Check your spam folder too."
+        : "New code sent. Check your inbox, and your spam folder too.",
+    );
     setDigits(emptyCode());
     setCooldown(RESEND_COOLDOWN_SECONDS);
     boxes.current[0]?.focus();

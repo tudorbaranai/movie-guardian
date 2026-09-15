@@ -116,6 +116,24 @@
   color: var(--danger);
 }
 
+/* "Forgot password?", tucked under the password box on the right. */
+.forgotLink {
+  align-self: flex-end;
+  margin-top: -8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.forgotLink:hover {
+  color: var(--text);
+}
+
+/* Forms on screens without the Sign in / Create account switcher above them. */
+.formSpaced {
+  margin-top: 24px;
+}
+
 .submit {
   height: 46px;
   margin-top: 4px;

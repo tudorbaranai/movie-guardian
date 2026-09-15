@@ -1,5 +1,5 @@
 // Tests for the login page (app/login/page.tsx): signing in, creating an
-// account, and when it hands over to the code screen.
+// account, "Forgot password?", and how it moves between those screens.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -22,12 +22,15 @@ vi.mock("@/lib/supabase", () => ({
       signUp: vi.fn(),
       resend: vi.fn(),
       verifyOtp: vi.fn(),
+      resetPasswordForEmail: vi.fn(),
+      updateUser: vi.fn(),
     },
   },
 }));
 
 import { supabase } from "@/lib/supabase";
 import LoginPage from "@/app/login/page";
+import { CODE_LENGTH } from "@/app/login/VerifyCode";
 
 const auth = vi.mocked(supabase.auth);
 const EMAIL = "reader@example.com";
@@ -233,5 +236,85 @@ describe("LoginPage", () => {
 
     expect(await screen.findByText("Invalid login credentials")).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  describe("Forgot password", () => {
+    it("is offered on Sign in, not on Create account", async () => {
+      const user = userEvent.setup();
+      render(<LoginPage />);
+
+      expect(
+        await screen.findByRole("button", { name: "Forgot password?" }),
+      ).toBeTruthy();
+
+      await user.click(screen.getByRole("tab", { name: "Create account" }));
+      expect(
+        screen.queryByRole("button", { name: "Forgot password?" }),
+      ).toBeNull();
+    });
+
+    it("goes email → code → new password → homepage", async () => {
+      auth.resetPasswordForEmail.mockResolvedValue({
+        data: {},
+        error: null,
+      } as never);
+      auth.verifyOtp.mockResolvedValue({ data: {}, error: null } as never);
+      auth.updateUser.mockResolvedValue({
+        data: { user: {} },
+        error: null,
+      } as never);
+      const user = userEvent.setup();
+      render(<LoginPage />);
+
+      // 1. Start from Sign in, with the email already typed.
+      await fillIn(user, { Email: EMAIL });
+      await user.click(
+        screen.getByRole("button", { name: "Forgot password?" }),
+      );
+      expect(
+        screen.getByRole("heading", { name: "Reset your password" }),
+      ).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: "Send code" }));
+      expect(auth.resetPasswordForEmail).toHaveBeenCalledWith(EMAIL);
+
+      // 2. The code screen, with a message that doesn't reveal whether the
+      //    account exists.
+      expect(
+        await screen.findByRole("heading", { name: "Enter your code" }),
+      ).toBeTruthy();
+      expect(screen.getByRole("status").textContent).toMatch(
+        /If there's an account for this email/,
+      );
+      await user.paste("7".repeat(CODE_LENGTH));
+      expect(auth.verifyOtp).toHaveBeenCalledWith(
+        expect.objectContaining({ email: EMAIL, type: "recovery" }),
+      );
+
+      // 3. Choose the new password.
+      expect(
+        await screen.findByRole("heading", { name: "Choose a new password" }),
+      ).toBeTruthy();
+      await user.type(screen.getByLabelText("New password"), PASSWORD);
+      await user.type(screen.getByLabelText("Confirm password"), PASSWORD);
+      await user.click(screen.getByRole("button", { name: "Save password" }));
+
+      // 4. Done: signed in, off to the homepage.
+      expect(auth.updateUser).toHaveBeenCalledWith({ password: PASSWORD });
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith("/"));
+    });
+
+    it("'Back to sign in' returns to the form", async () => {
+      const user = userEvent.setup();
+      render(<LoginPage />);
+
+      await user.click(
+        await screen.findByRole("button", { name: "Forgot password?" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Back to sign in" }));
+
+      expect(
+        screen.getByRole("heading", { name: "Welcome back" }),
+      ).toBeTruthy();
+    });
   });
 });
