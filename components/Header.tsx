@@ -118,6 +118,15 @@ export default function Header() {
                       My Movies
                     </Link>
 
+                    <Link
+                      href="/account"
+                      role="menuitem"
+                      className={styles.menuItem}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Account
+                    </Link>
+
                     <div className={styles.menuDivider} />
 
                     <button

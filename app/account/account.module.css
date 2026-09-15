@@ -1,0 +1,40 @@
+/* The Account page reuses the login card styles (app/login/login.module.css);
+   these are only the extra bits. */
+
+.detail {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+}
+
+.value {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.sectionTitle {
+  margin-bottom: 16px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
