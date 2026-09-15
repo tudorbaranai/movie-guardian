@@ -78,6 +78,8 @@ Two features:
   - **Forgot password?** on the Sign in tab: enter your email → type the 8-digit code from
     the "Reset password" email → choose a new password (typed twice) → signed in. The reply
     after "Send code" never reveals whether an account exists for that email.
+  - **Change password** on the new **Account** page (avatar menu → Account): current
+    password + new password typed twice, with an option to sign out other devices.
   - Auth emails go through **custom SMTP (Gmail)** so the templates can be edited.
 - [x] **QA fixes (Sept 2026):** the results-page search box no longer pops open by itself;
       crafted `/movie/…` addresses are refused (404); images load straight from TMDB instead of
@@ -219,7 +221,10 @@ the GitHub account `tudorbaranai`.
   (Authentication → Emails → Templates) shows `{{ .Token }}` and has no link.
 - **Password reset also uses a code.** The "Reset password" template shows `{{ .Token }}` and
   has no link. "Require current password when updating" must stay **off**, or people who
-  forgot their password couldn't set a new one.
+  forgot their password couldn't set a new one. (The Account page's "Change password"
+  checks the current password itself, by signing in with it before saving.)
+- _Optional:_ Emails → Templates → Security → **"Password changed"** sends a heads-up email
+  whenever a password changes.
 - **Email OTP length is 8** (for both emails) — it must match `CODE_LENGTH` in
   `app/login/VerifyCode.tsx`. Change both together.
 - **Custom SMTP = Gmail** (`smtp.gmail.com`, port 465, an App Password). Supabase requires
@@ -291,6 +296,11 @@ movie-guardian/
 │  │  ├─ NewPassword.tsx  # "Choose a new password" (after the reset code)
 │  │  ├─ ConfirmPasswordField.tsx # shared "Confirm password" box with live hint
 │  │  └─ login.module.css
+│  ├─ account/
+│  │  ├─ page.tsx         # /account — server component (sets the tab title)
+│  │  ├─ AccountSettings.tsx # signed-in check, who you are
+│  │  ├─ ChangePasswordForm.tsx # current + new password, sign out other devices
+│  │  └─ account.module.css
 │  ├─ my-movies/
 │  │  ├─ page.tsx         # stats, Seen/Watchlist tabs, sorting
 │  │  └─ my-movies.module.css
@@ -379,7 +389,8 @@ is still in `components/` if we want to revisit this later with a real browser.
 
 **Phases 0 and 1 are complete, verified, and live** at <https://movie-guardian.vercel.app>:
 search, movie pages, sign-up confirmed with an 8-digit email code, sign in, forgot password
-(with a code), mark seen / watchlist, 1–10 ratings, My Movies. `npm run check` (49 tests) and
+(with a code), change password (Account page), mark seen / watchlist, 1–10 ratings, My Movies.
+`npm run check` (59 tests) and
 the production build pass, `npm audit` reports 0 vulnerabilities, and the findings of the QA
 pass (desktop + phone, signed out and signed in) are fixed and live.
 
@@ -392,21 +403,30 @@ pass (desktop + phone, signed out and signed in) are fixed and live.
 ### Next steps (in order)
 
 Done on 2026-09-15: live sign-up test, QA fix batch, Confirm password, Forgot password
-(tested for real by the user), Supabase URL configuration (Site URL + 3 redirect URLs) and
-test-account cleanup. The Windows PC update was dropped — that PC isn't used for now.
+(tested for real by the user), Supabase URL configuration (Site URL + 3 redirect URLs),
+test-account cleanup, and **Change password** (Account page). The Windows PC update was
+dropped — that PC isn't used for now. The full plan behind the steps below is in PLAN.md.
 
-1. **Phase 2 — "Similar movies"** (the first machine-learning step):
-   1. A **Python** script (offline) that pulls a catalogue of movies from TMDB into Supabase.
-   2. A **local embedding model** (e.g. `sentence-transformers`) turns each film's text
-      (overview + genres + cast) into a vector. No paid APIs.
-   3. Enable **`pgvector`** in Supabase and store the vectors.
-   4. A **"Similar movies"** row on the movie page using nearest-neighbour search — compared
-      against TMDB's own "If you liked this" row.
-2. _Later, only when needed:_
+1. **Try Change password for real** on localhost and live (the user types the passwords).
+2. **Phase 2 — "Similar movies"** (the first machine-learning step, free):
+   1. Enable **`pgvector`** in Supabase and add a `movies` table with a vector column.
+   2. A script pulls ~5–10k movies from TMDB (title, plot, genres, top cast, director).
+   3. A free **pre-trained** embedding model turns each film into 384 numbers. Decide where it
+      runs: **Node** (Transformers.js — suggested, same language as the site), **Python**
+      (sentence-transformers) or Supabase's built-in **`gte-small`** (Edge Function).
+   4. A database function returns the nearest movies; a **"Similar movies"** row on the movie
+      page, next to TMDB's "If you liked this" row for comparison.
+3. **Taste vector + "Recommended for you"** — average of the vectors of films you rated
+   highly; nearest unseen films.
+4. **Learning loop without AI** — one short, skippable question after rating (question bank),
+   answers become preference scores; a **"Your taste"** page to see/edit/delete them.
+5. **AI-written questions + answer analysis** via an AI gateway (small cost, spending cap, key
+   only on the server).
+6. **"Because…" explanations** written once by an AI and saved.
+7. _Later, only when needed:_
    - **Custom domain + a transactional email service** (e.g. Resend) — worth it once the site
      is shared beyond a few friends, codes start landing in spam, or Gmail's daily sending
      limit gets close. Not needed during early development.
-   - A **"change password"** option for signed-in users (the reset flow only covers forgotten ones).
    - TypeScript 7 and ESLint 10 major upgrades (skipped on purpose for now).
 
 ### Gotchas that have already bitten us

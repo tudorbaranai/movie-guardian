@@ -22,13 +22,14 @@ They are one app: the tracking generates the data that makes the recommender sma
 
 ## 2. Decisions locked in
 
-| Question         | Decision                                                  |
-| ---------------- | --------------------------------------------------------- |
-| Recommender type | **Content-based**, our own model. No paid APIs.           |
-| ML depth         | Practical: local embedding model + a small taste-learner. |
-| Movie data       | **Free TMDB API key** (free signup, no payment).          |
-| Hosting          | Online for friends (free tiers).                          |
-| Stack            | Next.js + TypeScript · Supabase · Python (offline ML).    |
+| Question                            | Decision                                                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Recommender type                    | **Content-based**, our own model. No paid APIs for the core.                                                                                                             |
+| ML depth                            | Practical: a **pre-trained** embedding model (not trained by us) + a small taste-learner.                                                                                |
+| Movie data                          | **Free TMDB API key** (free signup, no payment).                                                                                                                         |
+| Hosting                             | Online for friends (free tiers) — live on Vercel.                                                                                                                        |
+| Stack                               | Next.js + TypeScript · Supabase (+ pgvector) · offline embedding script (Node, Python or a Supabase Edge Function — to decide).                                          |
+| AI gateway (e.g. Vercel AI Gateway) | **Optional, later, extras only:** AI-written questions and "why we picked this" sentences, cost-capped and saved once. Never used for the core "similar / for you" math. |
 
 ### Why content-based, not "Netflix-style"
 
@@ -62,15 +63,16 @@ with a single user.
    - pgvector (embeddings)
         ^
         | (offline, occasional)
-   Python scripts on my PC
+   Embedding script (offline — Node, Python or a Supabase Edge Function)
    - pull movies from TMDB
-   - compute embeddings (sentence-transformers, local)
+   - compute embeddings (free pre-trained model)
    - upload movies + vectors to Supabase
 ```
 
 **Key simplification:** only **two things run live** — Next.js (on Vercel) and
-Supabase — both free tier. Python is used **only offline** to build the movie data
-and embeddings. Postgres' `pgvector` extension (built into Supabase) does the
+Supabase — both free tier. The embedding script runs **only offline** to build the
+movie data and embeddings. (An optional AI gateway may later write questions and
+explanations — never the core similarity math.) Postgres' `pgvector` extension (built into Supabase) does the
 "find nearest movies" search, so we don't need a separate ML server running 24/7.
 
 ---
@@ -115,8 +117,10 @@ Maps my answers into a starting taste vector + filters:
 
 ### Phase 2 — Movie data + embeddings pipeline (first ML)
 
-- Python: pull a solid catalog of movies from TMDB → store in Supabase.
-- Compute embeddings locally → store in the `pgvector` column.
+- A script pulls a solid catalog of movies (~5–10k) from TMDB → store in Supabase.
+- Compute embeddings with a free **pre-trained** model (384 numbers per movie) → store
+  in the `pgvector` column. Where the model runs is still to decide: Node
+  (Transformers.js), Python (sentence-transformers) or Supabase's built-in `gte-small`.
 - "Similar movies" on each detail page (nearest-neighbor search).
 - **Deliverable:** "similar movies" works — validates the embeddings.
 
@@ -125,7 +129,16 @@ Maps my answers into a starting taste vector + filters:
 - Onboarding quiz builds my taste vector + filters.
 - "Recommended for you" = nearest unseen movies to my taste vector, minus dislikes.
 - Thumbs up/down updates my taste vector.
-- **Deliverable:** personalized recommendations.
+- **The learning loop (agreed 2026-09-15):** after rating a movie, show **one short,
+  skippable question** ("What hooked you most? The twisty plot / the visuals / …").
+  Answers become preference scores (e.g. "mind-bending plots +0.2") and nudge the taste
+  vector, so every rating + answer improves the next recommendations.
+  - Start with a **question bank** (free, no AI).
+  - Later: **AI-written questions** and analysis of free-text answers via an AI gateway
+    (small cost; only movie info + answers are sent, never name or email).
+  - A **"Your taste" page** shows, edits and deletes what the site has learned.
+  - New tables: `user_answers`, `taste_profile` (both behind Row-Level Security).
+- **Deliverable:** personalized recommendations that visibly improve with use.
 
 ### Phase 4 — Taste-learner + social
 
@@ -136,18 +149,22 @@ Maps my answers into a starting taste vector + filters:
 
 ### Phase 5 — Polish
 
-- "Why we picked this" explanations, better UI, mobile, performance.
+- "Why we picked this" explanations (optionally written once by an AI and saved),
+  better UI, mobile, performance.
 
 ---
 
-## 7. What we build first (immediate next step)
+## 7. What we build next (updated 2026-09-15)
 
-**Phase 0 + start of Phase 1:**
+Phases 0 and 1 are done and live (plus code-based sign-up, forgot password, change
+password and automated tests). Next, in order:
 
-1. Scaffold the Next.js + TypeScript project in this folder.
-2. Set up a free Supabase project (accounts + database).
-3. Get a free TMDB key.
-4. Build movie search + a detail page as the first working screen.
+1. **Phase 2 — "Similar movies"**: pgvector table, embedding script, nearest-neighbour
+   search, "Similar movies" row next to TMDB's row.
+2. **Taste vector + "Recommended for you"** (start of Phase 3).
+3. **Question bank after rating + "Your taste" page** (the learning loop, no AI).
+4. **AI-written questions + answer analysis** (AI gateway, cost-capped).
+5. **AI "why we picked this"** sentences, saved once (Phase 5).
 
 > Guiding rule: ship a tiny working thing at every step, deploy early, and only add
 > the ML once the plain website works end-to-end.
