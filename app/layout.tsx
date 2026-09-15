@@ -31,7 +31,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    // data-scroll-behavior="smooth": globals.css scrolls smoothly, and this
+    // tells Next.js 16 to switch that off while changing pages, so a new page
+    // appears at the top instantly instead of visibly scrolling up.
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+      data-scroll-behavior="smooth"
+    >
       <body>
         {/* Header and footer live here, so every page gets them automatically. */}
         {/* Loads "which films have I marked?" once, for every card below. */}

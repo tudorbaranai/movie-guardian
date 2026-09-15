@@ -124,6 +124,12 @@ export async function getPopular(): Promise<Movie[]> {
 export async function getMovie(
   id: string | number,
 ): Promise<MovieDetails | null> {
+  // TMDB movie ids are whole numbers. The id comes straight from the page
+  // address, so refuse anything else — otherwise a crafted address like
+  // /movie/..%2Fgenre%2Fmovie%2Flist would make us call a different TMDB
+  // endpoint with our token.
+  if (!/^\d+$/.test(String(id))) return null;
+
   return tmdbFetch<MovieDetails>(
     `/movie/${id}?append_to_response=credits,videos,recommendations`,
   );

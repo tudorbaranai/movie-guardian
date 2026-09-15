@@ -24,8 +24,14 @@ export default function MyMoviesPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [signedIn, setSignedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  // True when the database couldn't be reached, so we show an error with a
+  // retry button instead of a misleading "you haven't marked anything yet".
+  const [loadFailed, setLoadFailed] = useState(false);
   const [tab, setTab] = useState<Tab>("seen");
   const [sort, setSort] = useState<Sort>("added");
+
+  // Bumped by "Try again" to run the loading effect below once more.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -38,17 +44,24 @@ export default function MyMoviesPage() {
       setSignedIn(true);
 
       // No "where user_id = me" needed — Row-Level Security does that for us.
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_movies")
         .select("movie_id, title, poster_path, status, rating, created_at")
         .order("created_at", { ascending: false });
 
-      setRows((data as Row[]) ?? []);
+      setLoadFailed(Boolean(error));
+      setRows(error ? [] : ((data as Row[]) ?? []));
       setLoading(false);
     }
 
     load();
-  }, []);
+  }, [attempt]);
+
+  function retry() {
+    setLoading(true);
+    setLoadFailed(false);
+    setAttempt((count) => count + 1);
+  }
 
   const seen = useMemo(() => rows.filter((r) => r.status === "seen"), [rows]);
   const watchlist = useMemo(
@@ -94,6 +107,23 @@ export default function MyMoviesPage() {
           <Link href="/login" className={styles.cta}>
             Sign in
           </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <main className="container">
+        <div className={styles.signedOut}>
+          <h1 className={styles.title}>My Movies</h1>
+          <p className={styles.state} role="alert">
+            We couldn&apos;t load your movies just now. Check your connection
+            and try again.
+          </p>
+          <button type="button" className={styles.cta} onClick={retry}>
+            Try again
+          </button>
         </div>
       </main>
     );

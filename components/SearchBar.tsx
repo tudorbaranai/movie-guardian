@@ -35,6 +35,9 @@ export default function SearchBar({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  // True when the last search failed (TMDB down, network error…), so the
+  // panel can say so instead of a misleading "No matches".
+  const [failed, setFailed] = useState(false);
   // Which suggestion the arrow keys are sitting on. -1 means "none".
   const [activeIndex, setActiveIndex] = useState(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -52,17 +55,25 @@ export default function SearchBar({
 
     const timer = setTimeout(async () => {
       setLoading(true);
+      setFailed(false);
       try {
         const response = await fetch(
           `/api/search?q=${encodeURIComponent(trimmed)}`,
           { signal: controller.signal },
         );
+        if (!response.ok) throw new Error(`Search failed (${response.status})`);
         const data = await response.json();
         setSuggestions(data.results ?? []);
         setActiveIndex(-1);
-        setOpen(true);
+        // Deliberately NOT opening the panel here. It opens when you type in
+        // or click the box; otherwise a box that starts pre-filled (like the
+        // one on the search results page) would pop its list open by itself.
       } catch {
-        // An aborted request isn't an error worth showing anyone.
+        // An aborted request (you kept typing) isn't an error worth showing.
+        if (!controller.signal.aborted) {
+          setSuggestions([]);
+          setFailed(true);
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -152,6 +163,7 @@ export default function SearchBar({
             if (value.trim().length < 2) {
               setSuggestions([]);
               setLoading(false);
+              setFailed(false);
             }
           }}
           onFocus={() => setOpen(true)}
@@ -205,8 +217,12 @@ export default function SearchBar({
           ))}
 
           {suggestions.length === 0 && (
-            <p className={styles.status}>
-              {loading ? "Searching…" : "No matches"}
+            <p className={styles.status} role="status">
+              {loading
+                ? "Searching…"
+                : failed
+                  ? "Search isn't available right now. Try again in a moment."
+                  : "No matches"}
             </p>
           )}
         </div>

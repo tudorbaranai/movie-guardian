@@ -15,14 +15,25 @@ export async function GET(request: Request) {
   // One letter matches half of cinema — wait until there's something to go on.
   if (query.length < 2) return Response.json({ results: [] });
 
-  const movies = await searchMovies(query);
+  try {
+    const movies = await searchMovies(query);
 
-  const results = movies.slice(0, LIMIT).map((movie) => ({
-    id: movie.id,
-    title: movie.title,
-    year: yearOf(movie.release_date),
-    poster: posterUrl(movie.poster_path, "w185"),
-  }));
+    const results = movies.slice(0, LIMIT).map((movie) => ({
+      id: movie.id,
+      title: movie.title,
+      year: yearOf(movie.release_date),
+      poster: posterUrl(movie.poster_path, "w185"),
+    }));
 
-  return Response.json({ results });
+    return Response.json({ results });
+  } catch (error) {
+    // TMDB is down or refused us. Say so clearly (status 502 = "the service
+    // behind me failed"), so the search box can show an error instead of
+    // pretending nothing matched.
+    console.error("Search failed:", error);
+    return Response.json(
+      { results: [], error: "Search is unavailable right now." },
+      { status: 502 },
+    );
+  }
 }
