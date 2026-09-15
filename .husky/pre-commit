@@ -1,0 +1,8 @@
+# Runs before every `git commit`. If any step fails, the commit is stopped,
+# so broken or unformatted code never gets saved (or pushed to Vercel).
+# 1. Format + lint only the files being committed (see .lintstagedrc.json)
+npx lint-staged
+# 2. Type-check the whole project
+npm run typecheck
+# 3. Run every unit test once
+npm test
