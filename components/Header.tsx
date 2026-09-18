@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import SearchBar from "./SearchBar";
+import AiChat from "./AiChat";
 import styles from "./Header.module.css";
 
 // What to call someone in the nav bar. We ask for a nickname when they create
@@ -80,6 +81,9 @@ export default function Header() {
         </div>
 
         <nav className={styles.nav}>
+          {/* Always here, signed in or not — signed out it explains itself. */}
+          <AiChat signedIn={Boolean(user)} />
+
           {user ? (
             <>
               <Link href="/my-movies" className={styles.navLink}>

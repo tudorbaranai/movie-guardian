@@ -5,14 +5,16 @@ and as a way to learn modern web development. Everything runs on **free** tools.
 
 **Live:** <https://movie-guardian.vercel.app> · **Code:** <https://github.com/tudorbaranai/movie-guardian>
 
-Two features:
+Three features:
 
 1. **Recommendations** (the main goal, later phase): a self-hosted, content-based model
    suggests films for you based on your taste and history. No paid AI APIs.
 2. **Tracking** (built): search movies, mark them seen, rate them, keep watchlists.
+3. **Movie assistant** (built): a ✨ chat in the nav bar that answers movie questions
+   knowing what _you_ have watched, rated and saved.
 
 > Full roadmap and design decisions live in [PLAN.md](./PLAN.md).
-> _Last updated: 2026-09-15._
+> _Last updated: 2026-09-18._
 
 ---
 
@@ -86,6 +88,22 @@ Two features:
       Vercel's optimizer; "Try again" really reloads; search and My Movies show real errors.
 - [x] **Feedback loops (Sept 2026):** Vitest unit tests, TypeScript + ESLint + Prettier checks,
       and a **Husky pre-commit hook** that blocks commits when any of them fail.
+- [x] **Movie assistant — an AI chat in the nav bar (Sept 2026):**
+  - A ✨ **AI** sticker sits in the header. Click it and a chat panel drops down
+    (a full-width sheet on a phone) with a greeting and three suggested questions.
+  - The assistant is a **movie recommender**: before every conversation the server
+    reads _your_ `user_movies` rows and writes them into the model's instructions, so
+    it already knows what you loved, what you disliked and what's on your watchlist.
+  - Answers **stream in word by word** instead of appearing after a long pause.
+  - Runs on **Vercel AI Gateway** (one key, one spend cap, many providers) using
+    a **free** model — see [The movie assistant](#the-movie-assistant-ai-chat) below.
+- [x] **The assistant can look films up on TMDB (Sept 2026):**
+  - It has two **tools**, `search_movies` and `get_movie`. When it wants a fact it
+    stops and asks _us_ to fetch it, so release years, runtimes, directors and cast
+    come from TMDB instead of from what the model happens to remember.
+  - Every film it names is a **link to our own `/movie/[id]` page**.
+  - **One request to the model per question**, which is what makes it usable on a
+    free account limited to about five a minute.
 - [ ] Phase 2 — Similar movies (embeddings). Phase 3 — Recommender + quiz. Phase 4 — Social.
 
 ---
@@ -98,6 +116,7 @@ Two features:
 | **Supabase**                                | Accounts (auth) + Postgres database. Auth emails sent via Gmail SMTP. |
 | **TMDB**                                    | Source of movie data + posters (free tier).                           |
 | **Vercel**                                  | Hosting. Deploys automatically from GitHub `main`.                    |
+| **Vercel AI Gateway** + `openai` SDK        | One door to every AI model. Powers the ✨ movie assistant.            |
 | **Vitest + React Testing Library**          | Unit tests (`__tests__/`).                                            |
 | **ESLint · Prettier · Husky · lint-staged** | Code checks and formatting, enforced before every commit.             |
 
@@ -162,6 +181,11 @@ This file holds secrets and **is gitignored** (never committed / uploaded). It c
 TMDB_ACCESS_TOKEN=...                     # server-only (no NEXT_PUBLIC_ prefix)
 NEXT_PUBLIC_SUPABASE_URL=...              # https://<project>.supabase.co — nothing after it
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...  # sb_publishable_… — safe for the browser
+AI_GATEWAY_API_KEY=...                    # server-only — powers the ✨ movie assistant
+AI_MODEL=...                              # optional; default is a free model
+AI_FALLBACK_MODELS=...                    # optional; used when a model is DOWN
+AI_TOOL_ROUNDS=0                          # optional; TMDB tool calling, off by default
+AI_REASONING_EFFORT=low                   # optional; ONLY for effort-capable models
 ```
 
 - The `NEXT_PUBLIC_` prefix tells Next.js a value is allowed in the browser. The TMDB token
@@ -169,8 +193,11 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...  # sb_publishable_… — safe for the 
 - `TMDB_ACCESS_TOKEN` is the long **API Read Access Token** (`eyJ…`), _not_ the short "API Key".
 - **Never** use the Supabase **secret key** (`sb_secret_…`) in this app — it bypasses
   Row-Level Security, and nothing here needs it.
-- Vercel has its **own copy** of these 3 values (Project → Settings → Environment Variables).
-  `TMDB_ACCESS_TOKEN` is stored there as a **secret**.
+- `AI_GATEWAY_API_KEY` comes from **vercel.com → AI Gateway → API Keys → Create key**.
+  Without it the site works exactly as before and the ✨ panel says the assistant
+  isn't switched on — nothing else breaks.
+- Vercel has its **own copy** of these values (Project → Settings → Environment Variables).
+  `TMDB_ACCESS_TOKEN` and `AI_GATEWAY_API_KEY` are stored there as **secrets**.
 
 ---
 
@@ -282,7 +309,8 @@ movie-guardian/
 ├─ app/
 │  ├─ layout.tsx          # shared frame: header + footer on every page
 │  ├─ api/
-│  │  └─ search/route.ts  # /api/search?q=… — feeds the search suggestions
+│  │  ├─ search/route.ts  # /api/search?q=… — feeds the search suggestions
+│  │  └─ chat/route.ts    # /api/chat — the ✨ movie assistant (streams its answer)
 │  ├─ globals.css         # THE DESIGN SYSTEM — all colours/sizes as CSS variables
 │  ├─ page.tsx            # homepage: search results, or Trending + Popular
 │  ├─ page.module.css
@@ -319,11 +347,18 @@ movie-guardian/
 │  ├─ SearchBar.tsx       # search form + live suggestions dropdown
 │  ├─ ScrollToTop.tsx     # every page starts at the top (renders nothing)
 │  ├─ TrendingSpotlight.tsx # homepage showcase: top 5 trending, clickable
+│  ├─ AiChat.tsx         # the ✨ sticker in the nav + the chat panel it opens
 │  ├─ UserMoviesProvider.tsx # loads YOUR seen/watchlist marks once, shares them
 │  └─ GridSkeleton.tsx    # grey placeholder cards (available, not currently used)
 ├─ lib/
 │  ├─ tmdb.ts             # TMDB (server-side): search, trending, popular, details
-│  └─ supabase.ts         # browser Supabase client (auth + database)
+│  ├─ supabase.ts         # browser Supabase client (auth + database)
+│  ├─ supabase-server.ts  # SERVER Supabase client, acting as one signed-in person
+│  ├─ ai.ts               # the model client + which model/fallbacks to use
+│  ├─ movie-tools.ts      # the 2 TMDB lookups the assistant may ask us to run
+│  ├─ text-tool-calls.ts  # copes with models that write tool calls as text
+│  ├─ movie-links.ts      # **bold titles** → links, resolved against TMDB
+│  └─ watch-history.ts    # your films → the paragraph the assistant reads
 ├─ __tests__/             # unit tests, same folders as the code (login/, lib/, api/…)
 ├─ .husky/pre-commit      # checks that run before every commit
 ├─ .claude/launch.json    # lets Claude Code start the dev server ("movie-site")
@@ -347,6 +382,178 @@ provider's `refresh()` after you mark or unmark something, so the underlines on
 other cards update straight away instead of going stale until a reload.
 
 Because it needs to know who's signed in, `MovieCard` is a **client** component.
+
+### The movie assistant (AI chat)
+
+Click the **✨ AI** sticker in the header and a chat panel opens. It only answers
+movie questions, and it answers them knowing what _you_ have watched. It runs on a
+**free** model — no credits, no card, nothing to top up.
+
+#### How one question travels
+
+```
+   browser                        /api/chat (our server)            Vercel AI Gateway
+   -------                        ---------------------             -----------------
+   the chat so far     ──────▶    1. who are you?  (Supabase)
+   + your access token            2. read YOUR user_movies rows
+                                  3. turn them into a paragraph
+                                  4. ask the model, streaming ─────▶  a free model
+   words appear        ◀──────    5. rewrite **titles** into links  ◀──
+                                     and forward each word as it lands
+```
+
+**Exactly one request to the model per question.** That is the single most
+important number in this feature — see the free-tier table below.
+
+#### The five ideas behind it
+
+1. **The model has no memory of our site.** It only ever sees the text we hand it.
+   So `lib/watch-history.ts` writes a short summary — "Loved: Arrival 9/10, Heat
+   9/10 · Rated lowest: Cats 2/10 · Watchlist: Dune" — and `buildSystemPrompt()`
+   staples it to the front of the conversation along with the house rules. That
+   summary is the whole reason the answers feel personal.
+
+2. **The server proves who you are; the browser is not trusted.** The page sends
+   its Supabase **access token** in the `Authorization` header, and
+   `lib/supabase-server.ts` builds a server-side client carrying that token. The
+   _database_ then decides what may be read: the same Row-Level Security rules
+   apply, so the route can only ever see your rows. Letting the browser post its
+   own film list would have been simpler and forgeable.
+
+3. **The answer streams.** The route returns a `ReadableStream` of plain text, and
+   `AiChat.tsx` reads it with `response.body.getReader()`, appending each chunk to
+   the bubble. That's why the words type themselves out. (`TextDecoder` is used
+   with `{ stream: true }` because a chunk can split an emoji in half.)
+
+4. **We do the fact-checking, not the model.** The model is asked for
+   `**Arrival (2016)**` — something it can write in one breath — and
+   `lib/movie-links.ts` swaps that for `[Arrival (2016)](/movie/329865)` as the
+   text streams past, by searching TMDB itself. Free, cached for an hour, and no
+   extra request to the model. Two things fall out of it:
+   - **Wrong years get fixed.** "Heat (1996)" goes out as Heat (1995), linked.
+   - **Invented films stay bold.** No TMDB match means no link, so an unlinked
+     title is a quiet signal the model may have made it up.
+
+5. **Costs and abuse are capped.** Sign-in is required, there's a
+   20-messages-an-hour brake per user in the route, and the model itself is free.
+   An open AI endpoint on a public site is a bill waiting to happen.
+
+#### What the free tier actually gives you (measured 2026-09-18)
+
+|                                |                                                    |
+| ------------------------------ | -------------------------------------------------- |
+| Models a free account may call | **7** of ~376 — the rest answer `403`              |
+| Requests allowed back to back  | **5**, then `429`                                  |
+| Time to recover                | ~30s after a light burst, longer after a heavy one |
+| Is the limit per model?        | **No — it is account-wide**                        |
+
+Those numbers decided the whole design.
+
+**Why tool calling is off.** Letting the model look films up cost **three**
+requests per question (it once fired eight searches in one turn), so a single
+question ate the minute's allowance and the next two were refused. One request per
+question is the difference between a chat that works and one that apologises.
+
+**Why you can't buy headroom by spreading the load.** The obvious trick is to
+rotate across all seven free models, since each looks like its own bucket. It
+isn't. Exhaust one and _every_ free model answers `429` — tested directly with
+`ling-3.0-flash-fin-free`, `ling-3.0-flash-sante-free`, `laguna-s-2.1-free` and
+`ling-3.0-flash-fin`, all refused. **There is no way to raise this ceiling without
+paying.** So `AI_FALLBACK_MODELS` earns its place for _outages_ (Laguna answered
+`503` repeatedly during setup), not for capacity.
+
+**What we do instead.** A `429` no longer fails immediately: the route waits ~9s
+and retries, then ~21s and retries again (`RATE_LIMIT_WAITS_MS` in the route),
+which usually outlasts the limit. The reader just sees the typing dots for longer.
+Only if all three attempts are refused does the chat say so — and then it says how
+long to wait.
+
+#### Choosing a model
+
+The catalogue, prices and which models your account may use are in the Vercel
+dashboard under **AI Gateway → Models**. A model needs the **free** tag to be
+usable without credits, and the **tool-use** tag only if you turn tool calling
+back on.
+
+Set it in `.env.local` and **restart the dev server** (Next.js reads `.env.local`
+at startup). Leave everything commented out to use the defaults in `lib/ai.ts`:
+
+| Variable              | Default                                                    | Notes                                       |
+| --------------------- | ---------------------------------------------------------- | ------------------------------------------- |
+| `AI_MODEL`            | `inclusionai/ling-3.0-flash-vl-free`                       | free, no credits needed                     |
+| `AI_FALLBACK_MODELS`  | `inclusionai/ling-3.0-flash-vl,poolside/laguna-s-2.1-free` | tried in order when one is **down**         |
+| `AI_TOOL_ROUNDS`      | `0`                                                        | TMDB tool calling; needs credits to be sane |
+| `AI_REASONING_EFFORT` | unset                                                      | see below                                   |
+
+##### Why `AI_REASONING_EFFORT` is off by default
+
+"Think harder" is not one setting. The catalogue reports `reasoning_options` as
+`{type: "effort"}` for GPT 5.6 Luna, `{type: "toggle"}` for Laguna, and _nothing_
+for Ling. Sending `reasoning_effort` to a model that doesn't take one is a 400 and
+a dead answer — so we send it only when you explicitly set it.
+
+##### When the model writes its tool call instead of sending it
+
+Only relevant with `AI_TOOL_ROUNDS` turned up. The API has a proper field for
+"call this tool", and a well-behaved model uses it. Some models — including the
+free ones here, _intermittently_ — instead type the call into their answer:
+
+```
+<tool_call>search_movies
+<arg_key>query</arg_key>
+<arg_value>Spider-Man No Way Home</arg_value>
+</tool_call>
+```
+
+That fails twice over: the lookup never runs, and the markup lands in the chat
+bubble. `lib/text-tool-calls.ts` handles both — a filter that never lets the markup
+through (holding back even a partial `<tool_` until it knows what follows), and a
+parser that rebuilds the calls. The same model gets it right most of the time, so
+it's a shim rather than a reason to change models.
+
+#### If you ever do decide to pay
+
+Deliberately deferred on 2026-09-18 — the free setup works. The options, in order
+of how much they cost:
+
+1. **Vercel AI Gateway credits.** Top up under **AI Gateway → the credits button,
+   top right** (that dialog holds the card and auto top-up too), set a budget under
+   **AI Gateway → Budgets → API Keys**, then uncomment `AI_MODEL=openai/gpt-5.6-luna`
+   and `AI_REASONING_EFFORT=low`, and turn `AI_TOOL_ROUNDS` up to 2. About a third
+   of a cent per question. Note that buying credits **ends the free tier
+   permanently**, and a budget is a **soft cap** that can overshoot slightly.
+2. **Straight to a provider**, skipping Vercel: point `lib/ai.ts` at
+   `api.openai.com` or swap in the Anthropic SDK. Needs an API key from
+   platform.openai.com or console.anthropic.com **with credit on it** — a ChatGPT
+   Plus or Claude Pro subscription is _not_ an API key. You'd lose the budgets
+   screen, the fallbacks and the unified logs.
+3. **Vercel's BYOK** is the worst of both: their docs say _"To use BYOK, your team
+   needs purchased AI Gateway credits"_, so you'd pay Vercel **and** the provider.
+
+#### Upgrading the assistant
+
+1. **Richer history.** We send bare titles. Storing genre and year on `user_movies`
+   turns "Arrival 9/10" into "Arrival (2016, sci-fi/drama) 9/10" — a stronger hint
+   for almost no extra tokens, and no extra requests.
+2. **Turn tool calling back on** (`AI_TOOL_ROUNDS=2`) once there are credits, so it
+   can state runtimes and directors from TMDB rather than memory.
+3. **A "where can I watch it?" tool** via TMDB's `/watch/providers` (needs a region
+   constant), and a **browse** tool via `/discover` for "a funny film under 100
+   minutes".
+4. **Actions, not just talk.** Let it add a film to your watchlist when you say
+   "save that one" — one more tool, writing through the same access token.
+5. **Feed it the Phase 2 embeddings.** Once "similar movies" exists, we can compute
+   the nearest films ourselves and put _those_ in the prompt, so the assistant
+   explains a recommendation our own maths made.
+6. **Remember the conversation.** Chats vanish on reload today. A `chat_messages`
+   table behind Row-Level Security would keep them.
+
+#### A note on the AI panel's styling
+
+The panel lives inside the header, next to the account menu, and uses the same
+click-outside / Escape behaviour so the two feel like one thing. Below 520px it
+stops being a dropdown and becomes a `position: fixed` sheet pinned to both edges
+— a 380px box would hang off the side of a phone.
 
 ### A note on the sign-up code (why not a link)
 
@@ -385,12 +592,15 @@ is still in `components/` if we want to revisit this later with a real browser.
 
 > To pick up in a fresh chat, say: **"Read the README in movie-guardian and continue."**
 
-### Where things stand (2026-09-15)
+### Where things stand (2026-09-18)
 
 **Phases 0 and 1 are complete, verified, and live** at <https://movie-guardian.vercel.app>:
 search, movie pages, sign-up confirmed with an 8-digit email code, sign in, forgot password
 (with a code), change password (Account page), mark seen / watchlist, 1–10 ratings, My Movies.
-`npm run check` (59 tests) and
+The **✨ movie assistant** is built and tested locally but needs `AI_GATEWAY_API_KEY`
+(local **and** on Vercel) before it can answer — see
+[The movie assistant](#the-movie-assistant-ai-chat).
+`npm run check` (79 tests) and
 the production build pass, `npm audit` reports 0 vulnerabilities, and the findings of the QA
 pass (desktop + phone, signed out and signed in) are fixed and live.
 
@@ -407,8 +617,16 @@ Done on 2026-09-15: live sign-up test, QA fix batch, Confirm password, Forgot pa
 test-account cleanup, and **Change password** (Account page). The Windows PC update was
 dropped — that PC isn't used for now. The full plan behind the steps below is in PLAN.md.
 
-1. **Try Change password for real** on localhost and live (the user types the passwords).
-2. **Phase 2 — "Similar movies"** (the first machine-learning step, free):
+1. ~~Buy AI Gateway credits.~~ **Decided 2026-09-18: stay free.** The assistant was
+   tuned until it answers properly without paying, and it does — verified live: one
+   request per question, ten recommendations with ten correct links, off-topic
+   questions refused, invented films refused. The only cost is a ceiling of about
+   five questions a minute, which the route now waits out rather than erroring on.
+   If that ever becomes annoying, see
+   [If you ever do decide to pay](#if-you-ever-do-decide-to-pay).
+
+2. **Try Change password for real** on localhost and live (the user types the passwords).
+3. **Phase 2 — "Similar movies"** (the first machine-learning step, free):
    1. Enable **`pgvector`** in Supabase and add a `movies` table with a vector column.
    2. A script pulls ~5–10k movies from TMDB (title, plot, genres, top cast, director).
    3. A free **pre-trained** embedding model turns each film into 384 numbers. Decide where it
@@ -416,14 +634,14 @@ dropped — that PC isn't used for now. The full plan behind the steps below is 
       (sentence-transformers) or Supabase's built-in **`gte-small`** (Edge Function).
    4. A database function returns the nearest movies; a **"Similar movies"** row on the movie
       page, next to TMDB's "If you liked this" row for comparison.
-3. **Taste vector + "Recommended for you"** — average of the vectors of films you rated
+4. **Taste vector + "Recommended for you"** — average of the vectors of films you rated
    highly; nearest unseen films.
-4. **Learning loop without AI** — one short, skippable question after rating (question bank),
+5. **Learning loop without AI** — one short, skippable question after rating (question bank),
    answers become preference scores; a **"Your taste"** page to see/edit/delete them.
-5. **AI-written questions + answer analysis** via an AI gateway (small cost, spending cap, key
+6. **AI-written questions + answer analysis** via an AI gateway (small cost, spending cap, key
    only on the server).
-6. **"Because…" explanations** written once by an AI and saved.
-7. _Later, only when needed:_
+7. **"Because…" explanations** written once by an AI and saved.
+8. _Later, only when needed:_
    - **Custom domain + a transactional email service** (e.g. Resend) — worth it once the site
      is shared beyond a few friends, codes start landing in spam, or Gmail's daily sending
      limit gets close. Not needed during early development.

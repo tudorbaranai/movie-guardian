@@ -25,6 +25,12 @@ export type CastMember = {
   profile_path: string | null;
 };
 
+export type CrewMember = {
+  id: number;
+  name: string;
+  job: string;
+};
+
 export type Video = {
   key: string;
   name: string;
@@ -39,7 +45,10 @@ export type MovieDetails = Movie & {
   genres: { id: number; name: string }[];
   vote_count: number;
   // These come from "append_to_response" — extra data in the same request.
-  credits?: { cast: CastMember[] };
+  // `crew` is the rest of the people TMDB sends alongside the cast — the
+  // director, writers, composer. The movie page only shows the cast, but the
+  // AI assistant asks "who directed it?", so we declare it too.
+  credits?: { cast: CastMember[]; crew?: CrewMember[] };
   videos?: { results: Video[] };
   recommendations?: { results: Movie[] };
 };

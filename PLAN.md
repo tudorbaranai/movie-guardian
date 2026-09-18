@@ -22,14 +22,14 @@ They are one app: the tracking generates the data that makes the recommender sma
 
 ## 2. Decisions locked in
 
-| Question                            | Decision                                                                                                                                                                 |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Recommender type                    | **Content-based**, our own model. No paid APIs for the core.                                                                                                             |
-| ML depth                            | Practical: a **pre-trained** embedding model (not trained by us) + a small taste-learner.                                                                                |
-| Movie data                          | **Free TMDB API key** (free signup, no payment).                                                                                                                         |
-| Hosting                             | Online for friends (free tiers) — live on Vercel.                                                                                                                        |
-| Stack                               | Next.js + TypeScript · Supabase (+ pgvector) · offline embedding script (Node, Python or a Supabase Edge Function — to decide).                                          |
-| AI gateway (e.g. Vercel AI Gateway) | **Optional, later, extras only:** AI-written questions and "why we picked this" sentences, cost-capped and saved once. Never used for the core "similar / for you" math. |
+| Question                            | Decision                                                                                                                                                                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recommender type                    | **Content-based**, our own model. No paid APIs for the core.                                                                                                                                                                       |
+| ML depth                            | Practical: a **pre-trained** embedding model (not trained by us) + a small taste-learner.                                                                                                                                          |
+| Movie data                          | **Free TMDB API key** (free signup, no payment).                                                                                                                                                                                   |
+| Hosting                             | Online for friends (free tiers) — live on Vercel.                                                                                                                                                                                  |
+| Stack                               | Next.js + TypeScript · Supabase (+ pgvector) · offline embedding script (Node, Python or a Supabase Edge Function — to decide).                                                                                                    |
+| AI gateway (e.g. Vercel AI Gateway) | **In use since 2026-09-17, for extras only.** Powers the ✨ movie-assistant chat (GPT 5.6 Luna), and later AI-written questions and "why we picked this" sentences. Cost-capped. Never used for the core "similar / for you" math. |
 
 ### Why content-based, not "Netflix-style"
 
@@ -154,11 +154,20 @@ Maps my answers into a starting taste vector + filters:
 
 ---
 
-## 7. What we build next (updated 2026-09-15)
+## 7. What we build next (updated 2026-09-17)
 
 Phases 0 and 1 are done and live (plus code-based sign-up, forgot password, change
-password and automated tests). Next, in order:
+password and automated tests). A **✨ movie-assistant chat** is now built too — an
+AI in the nav bar that reads your seen / rated / watchlist rows and recommends from
+them, through Vercel AI Gateway. It is an _extra_, not the recommender: it does no
+vector maths and nothing below depends on it. Next, in order:
 
+0. **Done (2026-09-18): the assistant works, and it's free.** One model request per
+   question (tool calling off), film links resolved server-side against TMDB, and a
+   `429` waited out rather than shown as an error. Paying — Vercel credits, a direct
+   provider key, or BYOK — was considered in detail and deliberately deferred; the
+   free ceiling is about five questions a minute and is account-wide, so it cannot be
+   worked around, only paid past. Revisit only if it becomes annoying in real use.
 1. **Phase 2 — "Similar movies"**: pgvector table, embedding script, nearest-neighbour
    search, "Similar movies" row next to TMDB's row.
 2. **Taste vector + "Recommended for you"** (start of Phase 3).

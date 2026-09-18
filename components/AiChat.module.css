@@ -1,0 +1,326 @@
+/* The ✨ sticker in the nav bar, and the chat window it drops down.
+   Every colour here comes from globals.css, so the panel restyles itself
+   automatically if the site palette ever changes. */
+
+.wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* ------------------------------- the sticker ------------------------------ */
+
+.sticker {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px 6px 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sticker:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+/* Same sticker, lit up while its panel is open. */
+.stickerOpen {
+  composes: sticker;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.stickerIcon {
+  font-size: 14px;
+}
+
+/* -------------------------------- the panel ------------------------------- */
+
+.panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  max-height: min(560px, calc(100vh - var(--header-height) - 40px));
+  background: var(--bg-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px 11px 14px;
+  background: var(--nav);
+  border-bottom: 1px solid var(--border);
+}
+
+.headTitle {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.close {
+  padding: 2px 7px;
+  font-size: 14px;
+  color: var(--text-faint);
+  border-radius: var(--radius-sm);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.close:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ------------------------------- the messages ----------------------------- */
+
+.messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.bubble {
+  max-width: 88%;
+  padding: 9px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: var(--radius);
+  /* Keeps the model's line breaks and bullet lists looking like a list. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.fromAi {
+  align-self: flex-start;
+  background: var(--surface);
+  border-bottom-left-radius: 4px;
+}
+
+.fromYou {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+/* A film title the model wrote in **bold**. */
+.title {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.fromYou .title {
+  color: #fff;
+}
+
+/* A film title the model linked to one of our own movie pages. Underlined on
+   purpose — in a wall of chat text, gold alone doesn't say "click me". */
+.titleLink {
+  color: var(--gold);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: rgba(245, 197, 24, 0.4);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.titleLink:hover {
+  text-decoration-color: var(--gold);
+}
+
+/* The three bouncing dots shown while we wait for the first word. */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 13px 14px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  animation: bounce 1.2s infinite ease-in-out;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  35% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* ---------------------------- suggested questions -------------------------- */
+
+.starters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.starter {
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: left;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.starter:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* --------------------------------- the form ------------------------------- */
+
+.form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  font-size: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+.input:disabled {
+  opacity: 0.6;
+}
+
+.send {
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.send:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.error {
+  padding: 0 14px 8px;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.footnote {
+  padding: 0 14px 11px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* ------------------------------ signed-out view ---------------------------- */
+
+.signedOut {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 16px 20px;
+}
+
+.signedOutText {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.signInButton {
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.signInButton:hover {
+  background: var(--accent-hover);
+}
+
+/* ------------------------------- responsive ------------------------------- */
+
+/* On a phone the panel stops being a dropdown and becomes a sheet pinned to
+   both edges of the screen — a 380px box would hang off the side. */
+@media (max-width: 520px) {
+  .panel {
+    position: fixed;
+    top: calc(var(--header-height) + 8px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: calc(100vh - var(--header-height) - 24px);
+  }
+
+  .stickerText {
+    display: none;
+  }
+
+  .sticker {
+    padding: 6px 10px;
+  }
+}
