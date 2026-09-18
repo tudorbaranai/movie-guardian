@@ -7,18 +7,21 @@
 //   the chat so far    ──────▶    1. who are you? (Supabase)
 //   + your access token           2. read YOUR user_movies rows
 //                                 3. write a system prompt from them
-//                                 4. ask the model, streaming ─────▶  OpenAI
-//   words appear       ◀──────    5. forward each word as it arrives ◀──
+//                                 4. ask the model, streaming ─────▶  a model
+//   words appear       ◀──────    5. rewrite **titles** into links, and
+//                                    forward each word as it arrives ◀──
 //
 // It streams, so the answer types itself out instead of appearing after a long
 // silence. Signing in is required: the whole point is personal answers, and an
 // AI endpoint anyone on the internet could hammer would cost real money.
 //
-// Step 4 can repeat. The model is offered two TMDB tools (see lib/movie-tools.ts);
-// if it uses one, that round produces no words — just a request for a lookup —
-// so we run it, add the result, and ask again:
+// **Exactly one trip to the model per question**, because AI_TOOL_ROUNDS is 0 by
+// default. That is the whole reason this works on a free account — see lib/ai.ts.
+// The film links don't need the model: lib/movie-links.ts resolves the titles it
+// writes in **bold** against TMDB as the words go past, for free.
 //
-//   ask ──▶ "call search_movies(heat)" ──▶ we call TMDB ──▶ ask again ──▶ words
+// Turn AI_TOOL_ROUNDS up (with credits) and step 4 starts repeating instead: the
+// model asks for a lookup, that round produces no words, we run it and ask again.
 import type OpenAI from "openai";
 import {
   AI_FALLBACK_MODELS,
@@ -64,9 +67,13 @@ const RATE_LIMIT_WAITS_MS = [9_000, 21_000];
 // TMDB request and more text to pay for, so cap them.
 const MAX_CALLS_PER_ROUND = 3;
 
-/** Messages per user per window, a cheap brake on accidental loops. */
-const RATE_LIMIT = 20;
-const RATE_WINDOW_MS = 60 * 60 * 1000;
+// Our OWN brake on one person, not the gateway's. Named carefully because
+// RATE_LIMIT_WAITS_MS above is an unrelated thing — that one is how long we
+// wait out the *gateway* saying no; this one is how often *we* say no.
+// It earns its keep mainly as insurance for the day this runs on a paid model
+// and something loops.
+const MESSAGES_PER_HOUR = 20;
+const MESSAGE_WINDOW_MS = 60 * 60 * 1000;
 
 // A plain Map is a per-server-process memory, so this is a speed bump rather
 // than a vault: a second server instance has its own counter. The real spend
@@ -76,9 +83,9 @@ const recentCalls = new Map<string, number[]>();
 function overRateLimit(userId: string) {
   const now = Date.now();
   const calls = (recentCalls.get(userId) ?? []).filter(
-    (at) => now - at < RATE_WINDOW_MS,
+    (at) => now - at < MESSAGE_WINDOW_MS,
   );
-  if (calls.length >= RATE_LIMIT) {
+  if (calls.length >= MESSAGES_PER_HOUR) {
     recentCalls.set(userId, calls);
     return true;
   }
