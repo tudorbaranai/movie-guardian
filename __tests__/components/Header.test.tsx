@@ -10,6 +10,8 @@ import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  // AiChat sits in the header and reads the address to spot a film page.
+  usePathname: () => "/",
 }));
 // Plain elements stand in for Next's link and image components.
 vi.mock("next/link", () => ({

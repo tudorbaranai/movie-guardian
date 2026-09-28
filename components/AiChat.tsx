@@ -11,10 +11,16 @@
 // chunk. That's what makes the words appear to type themselves.
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import styles from "./AiChat.module.css";
 
 type Message = { role: "user" | "assistant"; content: string };
+
+// If the chat is opened from a film page, the server can put that film's real
+// facts in front of the model — so "is it any good?" means the film on screen
+// rather than whatever the model guesses from.
+const MOVIE_PAGE = /^\/movie\/(\d+)\/?$/;
 
 const STARTERS = [
   "What should I watch tonight?",
@@ -88,6 +94,7 @@ function Formatted({
 }
 
 export default function AiChat({ signedIn }: { signedIn: boolean }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -153,7 +160,10 @@ export default function AiChat({ signedIn }: { signedIn: boolean }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({
+          messages: history,
+          pageMovieId: Number(pathname?.match(MOVIE_PAGE)?.[1]) || null,
+        }),
       });
 
       if (!response.ok || !response.body) {

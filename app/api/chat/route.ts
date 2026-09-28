@@ -31,6 +31,7 @@ import {
   ai,
   aiIsConfigured,
 } from "@/lib/ai";
+import { buildChatContext } from "@/lib/chat-context";
 import { MovieLinkEnricher } from "@/lib/movie-links";
 import { MOVIE_TOOLS, runMovieTool } from "@/lib/movie-tools";
 import { bearerToken, supabaseForToken } from "@/lib/supabase-server";
@@ -119,6 +120,13 @@ function fail(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
+/** A TMDB movie id sent by the browser, or null if it isn't one. */
+function movieId(value: unknown): number | null {
+  const id = typeof value === "string" ? Number(value) : value;
+  if (typeof id !== "number" || !Number.isInteger(id) || id < 1) return null;
+  return id;
+}
+
 /**
  * Turn a gateway failure into a sentence that says what to actually DO.
  *
@@ -195,6 +203,18 @@ export async function POST(request: Request) {
   const messages = cleanMessages((body as { messages?: unknown })?.messages);
   if (!messages) return fail("Bad request.", 400);
 
+  // Which film page the chat was opened from, if any. It comes from the
+  // browser, so it is only ever used as a TMDB id to look up — a junk value
+  // means no extra context, never an error.
+  const pageMovieId = movieId((body as { pageMovieId?: unknown })?.pageMovieId);
+
+  // The same turns, as plain strings — `cleanMessages` guarantees that, but
+  // OpenAI's type allows richer content, so say it once here.
+  const plainTurns = messages.map((turn) => ({
+    role: String(turn.role),
+    content: typeof turn.content === "string" ? turn.content : "",
+  }));
+
   // Row-Level Security means this can only ever return THIS person's rows.
   const { data: rows, error } = await supabase
     .from("user_movies")
@@ -206,9 +226,16 @@ export async function POST(request: Request) {
     return fail("We couldn't read your movies just now. Try again.", 502);
   }
 
+  // Facts we look up ourselves, before the model is asked anything: the film
+  // page they opened the chat from, and every film already linked earlier in
+  // this conversation. Free — TMDB, cached for an hour — and it costs no extra
+  // request to the model, which is the only budget that matters here.
+  const facts = await buildChatContext({ messages: plainTurns, pageMovieId });
+
   const system = buildSystemPrompt(
     buildWatchHistory((rows ?? []) as WatchedMovie[]),
     AI_TOOL_ROUNDS > 0,
+    { facts },
   );
 
   // Hand the browser a stream it can read word by word. We send plain text,

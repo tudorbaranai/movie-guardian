@@ -21,6 +21,8 @@ vi.mock("@/lib/ai", () => ({
 vi.mock("@/lib/tmdb", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tmdb")>()),
   searchMovies: vi.fn(async () => []),
+  // lib/chat-context.ts looks films up before the model is called.
+  getMovie: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/supabase-server", async (importOriginal) => ({

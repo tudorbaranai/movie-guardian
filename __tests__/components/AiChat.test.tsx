@@ -10,6 +10,10 @@ vi.mock("next/link", () => ({
     createElement("a", props),
 }));
 
+// Which page the chat was opened from. Tests that care set it themselves.
+let pathname = "/";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
@@ -56,6 +60,7 @@ function openPanel() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  pathname = "/";
 });
 
 describe("AiChat", () => {
@@ -97,7 +102,26 @@ describe("AiChat", () => {
     expect(request.headers.Authorization).toBe("Bearer token-123");
     expect(JSON.parse(String(request.body))).toEqual({
       messages: [{ role: "user", content: "what next?" }],
+      // Not on a film page, so there's no film to hand the server.
+      pageMovieId: null,
     });
+  });
+
+  it("tells the server which film page the chat was opened from", async () => {
+    // Asked from /movie/949, "is it any good?" means Heat — so the server can
+    // put Heat's real TMDB facts in front of the model instead of guessing.
+    pathname = "/movie/949";
+    vi.stubGlobal("fetch", streamingFetch(["Sure."]));
+    const user = userEvent.setup();
+
+    render(<AiChat signedIn />);
+    await openPanel();
+    await user.type(screen.getByRole("textbox"), "is it any good?");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await screen.findByText("Sure.");
+    const request = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body)).pageMovieId).toBe(949);
   });
 
   it("turns a film the model linked into a link to our own movie page", async () => {
