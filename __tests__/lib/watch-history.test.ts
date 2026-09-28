@@ -81,6 +81,56 @@ describe("buildSystemPrompt", () => {
     expect(buildSystemPrompt("")).toContain("has not tracked any films yet");
   });
 
+  // Each of these is a rule added because the live model broke it on
+  // 22 Sep 2026. They're assertions about the *contract*, not about prose, so
+  // the prompt can be reworded freely as long as the promise survives.
+  it("tells the model what today's date is", () => {
+    const prompt = buildSystemPrompt("", false, {
+      now: new Date("2026-09-23T10:00:00Z"),
+    });
+
+    // Asked what Nolan directed most recently, it answered "Oppenheimer
+    // (2023)" with no hedge. It has no clock unless we give it one.
+    expect(prompt).toContain("23 September 2026");
+  });
+
+  it("gives it one exact phrase to use when it isn't sure", () => {
+    // "Say so plainly" is not something a test — or a model — can act on.
+    expect(buildSystemPrompt("")).toContain(`"I'm not sure"`);
+  });
+
+  it("tells it never to invent a role, and never to embellish", () => {
+    const prompt = buildSystemPrompt("");
+
+    // It gave Ewan McGregor Jeff Bridges' part in Tron: Legacy, and placed
+    // Bill Murray's Zombieland scene in the wrong city.
+    expect(prompt).toContain("Never invent");
+    expect(prompt).toContain("Add nothing for colour");
+  });
+
+  it("keeps bold for films only, and puts TV shows in plain text", () => {
+    const prompt = buildSystemPrompt("");
+
+    // Everything bold gets searched on TMDB on the way out, so a bolded
+    // series title becomes a link to an unrelated film of the same name.
+    expect(prompt).toContain("**Arrival (2016)**");
+    expect(prompt).toContain("A TV SHOW gets plain text");
+    expect(prompt).toContain("Bold is ONLY ever a film title");
+  });
+
+  it("carries checked facts, and says they beat the model's memory", () => {
+    const prompt = buildSystemPrompt("", false, {
+      facts: "- 101 Dalmatians (1996) — starring Hugh Laurie as Jasper",
+    });
+
+    expect(prompt).toContain("Hugh Laurie as Jasper");
+    expect(prompt).toContain("prefer them over what you remember");
+  });
+
+  it("says nothing about checked facts when there are none", () => {
+    expect(buildSystemPrompt("")).not.toContain("Checked facts");
+  });
+
   it("tells it to look films up only when it actually can", () => {
     const withTools = buildSystemPrompt("", true);
     expect(withTools).toContain("search_movies");

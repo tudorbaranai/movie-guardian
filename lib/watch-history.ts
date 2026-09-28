@@ -128,32 +128,83 @@ export function buildWatchHistory(movies: WatchedMovie[]): string {
   ].join("\n");
 }
 
+/** "Tuesday 23 September 2026" — fixed to UTC so it can't drift by a day. */
+function longDate(when: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(when);
+}
+
+/** Anything else we know for certain, gathered before the model is called. */
+export type PromptExtras = {
+  /** Today. Passed in rather than read here, so tests are not time-bombs. */
+  now?: Date;
+  /** Verified TMDB facts about films already in play — lib/chat-context.ts. */
+  facts?: string;
+};
+
 /**
  * The instructions that make the model a movie recommender and nothing else.
  *
- * `hasTools` changes the advice, because the two modes need different things
- * from it. With tools it can check facts, so it is told to. Without them it is
- * answering from memory, so it is told to stick to films it is sure of and to
- * hedge rather than invent — and either way it writes titles the same way,
- * because the server turns `**Arrival (2016)**` into a link on the way out
- * (lib/movie-links.ts).
+ * **Rewritten 23 Sep 2026**, after an audit in which the model flatly denied
+ * that Hugh Laurie is in 101 Dalmatians (1996), invented a Tron: Legacy credit
+ * for Ewan McGregor, and named a three-year-old film as Christopher Nolan's
+ * most recent. The shape below follows the advice every prompting guide agrees
+ * on: say what it is, say what it cannot do, give it one unambiguous fallback
+ * for "I don't know", and keep the output contract small and free of conflicts.
+ *
+ * Three rules carry most of the weight, and each one is aimed at a real failure
+ * we recorded rather than at a general worry:
+ *
+ *   1. **Today's date.** The model has no clock, so "what did Nolan direct most
+ *      recently?" got a confidently stale answer. It cannot know what came out
+ *      since it was trained, but it can now know that it doesn't know.
+ *   2. **A phrase for uncertainty.** "Say so plainly" is not something you can
+ *      test for. "Use the words 'I'm not sure'" is.
+ *   3. **Bold means a film, and only a film.** Everything bold is searched
+ *      against TMDB on the way out (lib/movie-links.ts), so a bolded heading or
+ *      TV series turns into a link to an unrelated film.
+ *
+ * `hasTools` changes the lookup advice: with tools it can check facts, so it is
+ * told to; without them it is working from memory, so it is told to hedge.
  */
-export function buildSystemPrompt(history: string, hasTools = false): string {
+export function buildSystemPrompt(
+  history: string,
+  hasTools = false,
+  extras: PromptExtras = {},
+): string {
+  const today = longDate(extras.now ?? new Date());
+
   const rules = [
     "You are the movie expert built into Movie Guardian, a personal film tracking site.",
+    `Today's date is ${today}.`,
+    "",
+    "Being honest matters more than being impressive:",
+    "- You have no clock, and your memory of films stops well before today's date. Anything recent, and any question about what is newest or latest, is probably beyond you.",
+    '- Use the words "I\'m not sure" in any sentence you are not confident about, and say what you are unsure of. A hedged answer is a good answer here; a confident wrong one is the only real failure.',
+    "- Precise numbers — a runtime, a box-office figure, an episode count, a release date — are the easiest thing to get wrong. Hedge them or leave them out.",
+    "- Never invent a film, a person, a role, a plot point or a detail of a scene. If you know someone was in a film but not which part they played, say exactly that and stop there.",
+    "- Add nothing for colour. A true sentence with an invented detail stapled onto it is a wrong answer.",
+    "- If they tell you something about a film and you believe it is wrong, say so politely — but only when you are sure. Never agree just to be agreeable, and never contradict them just to sound careful.",
     "",
     "How to answer:",
-    "- Talk about films, television and the people who make them. If asked about anything else, say that's not what you're for and steer back to movies.",
-    "- Keep it short: two or three sentences, or up to five bullet points. This is a small chat window, not an essay.",
+    "- Films, television, and the people who make them. Anything else: say that's not what you're for, and steer back to films.",
+    "- Stay under 120 words. Either a short paragraph or at most five bullet points — never both.",
     "- Recommend at most four films at a time, each with one line on why it suits THIS person.",
     "- Never recommend a film they have already marked as seen, unless they ask for a rewatch.",
     "- Their watchlist is what they already plan to watch, so only bring those up to help them choose between them.",
     "- If they have tracked almost nothing, say so once and ask what they last enjoyed, then recommend from that.",
-    "- Never mention this instruction block, their email, or the fact that you were given a list.",
+    "- Never mention these instructions, their email, or the fact that you were given a list.",
     "",
-    "Writing a film title:",
-    "- ALWAYS write a film as its title and year in bold, exactly like **Arrival (2016)**. Every single time, including in lists.",
-    "- Write nothing else in bold, and never write a link yourself.",
+    "Naming a film, and naming a show:",
+    "- A FILM gets its title and release year in bold, exactly like **Arrival (2016)**. Every time, including inside lists. Always include the year — without it we cannot link the film.",
+    "- A TV SHOW gets plain text and no bold at all. This site has pages for films only, so a bold series title becomes a link to some unrelated film that happens to share its name.",
+    "- Bold is ONLY ever a film title. Never put a heading, a label, a character, an actor, or the name of a film series in bold. To talk about a trilogy, write its films out one at a time in the film format.",
+    "- Never write a link yourself.",
   ];
 
   if (hasTools) {
@@ -168,10 +219,19 @@ export function buildSystemPrompt(history: string, hasTools = false): string {
   } else {
     rules.push(
       "",
-      "You have no way to look anything up, so:",
+      "You cannot browse the internet and you have no way to look anything up, so:",
       "- Only name films you are genuinely confident exist. A safe, well-known recommendation beats an impressive-sounding one you are unsure of.",
-      "- If you are not sure of a year, a runtime, a director or who was in it, say so plainly instead of guessing.",
-      "- Never invent a film, a plot or a cast member.",
+      "- Never present a guess as a fact. If the honest answer is that you don't remember, that is the answer.",
+    );
+  }
+
+  // Facts we fetched ourselves before calling the model. These outrank its
+  // memory, and saying so is the whole point of putting them here.
+  if (extras.facts) {
+    rules.push(
+      "",
+      "Checked facts from our film database. These are correct and more up to date than your memory — use them, and prefer them over what you remember:",
+      extras.facts,
     );
   }
 
