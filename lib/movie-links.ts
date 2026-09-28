@@ -16,6 +16,20 @@
 // "Heat (1996)" goes out as Heat (1995), linked. A title TMDB has never heard
 // of stays bold and unlinked, which is a useful tell that the model may have
 // invented it.
+//
+// **What we learned the hard way (audit, 22 Sep 2026).** `**bold**` is *also*
+// the natural way to write a heading, a label, a franchise or a TV series, and
+// the model reaches for it constantly. We used to search TMDB for every bold
+// span we saw, so real answers shipped these links:
+//
+//     **Runtime:**   -> /movie/617761   ("Runtime", 2019)
+//     **Star Wars**  -> /movie/11       (the 1977 original, not the trilogy)
+//     **House (1977)** -> /movie/25623  (a Japanese horror film, not the show)
+//
+// A confident link to the wrong film is worse than no link, so the rules below
+// are deliberately suspicious. The prompt now also asks for TV shows in plain
+// text, because nothing here can tell a film from a series with the same name —
+// that half of the problem is only fixable in the instructions.
 import { searchMovies, yearOf } from "@/lib/tmdb";
 
 /**
@@ -30,11 +44,75 @@ const BOLD_TITLE = /^\*\*([^*].*?)(?:\s*\((\d{4})\))?\*\*$/;
 /** A year this far out is a different film, not a slip. */
 const YEAR_TOLERANCE = 1;
 
+/**
+ * `**Trainspotting** (1996)` — the year written just *outside* the bold.
+ *
+ * The model does this constantly however firmly it is asked not to. We read the
+ * year anyway and swallow it, because the link label we build already ends in
+ * "(1996)" and printing it twice looks broken.
+ *
+ * The character class here and below holds a space AND a non-breaking space —
+ * the second one is invisible in an editor, so don't "tidy" it away. Models
+ * emit it often enough to matter.
+ */
+const TRAILING_YEAR = /^[  ]?\((\d{4})\)/;
+
+/**
+ * `**House** (2004–2012)` — a *range* of years, which is how anyone writes a
+ * TV series. We never link these: the site has film pages only, and searching
+ * TMDB for "House" finds a 1977 horror film that has nothing to do with it.
+ */
+const TRAILING_RANGE = /^[  ]?\((\d{4})\s*[–—-]\s*(?:\d{4}|present|now|)\)/i;
+
+/**
+ * How far past a closing `**` we must see before deciding whether a year
+ * follows it. "(2004–present)" is the longest thing we look for.
+ */
+const LOOKAHEAD = 18;
+
+/** Longest thing we will treat as a film title. Beyond this it's a sentence. */
+const MAX_TITLE_LENGTH = 80;
+
 function normalise(title: string) {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+/**
+ * Is this bold text plausibly a film title at all?
+ *
+ * Cheap, local, and it runs *before* the TMDB search — the point is not only to
+ * avoid a wrong link but to avoid asking the question. `**Runtime:**` used to
+ * match a real 2019 film called "Runtime"; nothing downstream could have
+ * spotted that, because by then it was a perfectly good title.
+ */
+function looksLikeATitle(title: string) {
+  if (!title || title.length > MAX_TITLE_LENGTH) return false;
+  // A markdown label: "**Runtime:**", "**Box office:**". Never a film.
+  if (title.endsWith(":")) return false;
+  // A title is at least one letter. Rules out "**—**", "**1.**" and friends.
+  if (!/\p{L}/u.test(title)) return false;
+  // Bold spanning a line break is formatting, not a title.
+  if (/[\n\r]/.test(title)) return false;
+  return true;
+}
+
+/** What, if anything, follows the closing `**`. */
+type Trailer =
+  | { kind: "none"; length: 0 }
+  | { kind: "year"; year: string; length: number }
+  | { kind: "range"; length: number };
+
+function readTrailer(after: string): Trailer {
+  const range = after.match(TRAILING_RANGE);
+  if (range) return { kind: "range", length: range[0].length };
+
+  const year = after.match(TRAILING_YEAR);
+  if (year) return { kind: "year", year: year[1], length: year[0].length };
+
+  return { kind: "none", length: 0 };
 }
 
 /**
@@ -48,34 +126,48 @@ async function findMovie(title: string, year: string | undefined) {
   if (results.length === 0) return null;
 
   const wanted = normalise(title);
-  const exact = results.filter((movie) => normalise(movie.title) === wanted);
-  const candidates = exact.length > 0 ? exact : [];
+  const candidates = results.filter(
+    (movie) => normalise(movie.title) === wanted,
+  );
+  if (candidates.length === 0) return null;
 
-  // With a year to go on, prefer the film from that year.
-  if (year && candidates.length > 0) {
-    const byYear = candidates.find(
-      (movie) =>
-        Math.abs(Number(yearOf(movie.release_date) ?? 0) - Number(year)) <=
-        YEAR_TOLERANCE,
+  // With a year to go on, the year has to agree. If the model says 1977 and the
+  // only "House" TMDB has is from 1995, those are two different films and we
+  // would rather link neither. (A one-year slip is still forgiven, and TMDB's
+  // year then wins — that's the "Heat (1996)" case.)
+  if (year) {
+    return (
+      candidates.find(
+        (movie) =>
+          Math.abs(Number(yearOf(movie.release_date) ?? 0) - Number(year)) <=
+          YEAR_TOLERANCE,
+      ) ?? null
     );
-    if (byYear) return byYear;
   }
 
-  // No year, or the year didn't match anything: the best exact title wins.
-  return candidates[0] ?? null;
+  // No year at all: the best exact title match wins.
+  return candidates[0];
 }
 
 /**
  * Rewrite one `**…**` span. Returns a link when we're sure, and the original
  * bold text when we're not.
  */
-async function linkFor(span: string, seen: Map<string, string>) {
+async function linkFor(
+  span: string,
+  trailingYear: string | undefined,
+  seen: Map<string, string>,
+) {
   const match = span.match(BOLD_TITLE);
   if (!match) return span;
 
-  const [, rawTitle, year] = match;
+  const [, rawTitle, innerYear] = match;
   const title = rawTitle.trim();
-  if (!title) return span;
+  if (!looksLikeATitle(title)) return span;
+
+  // A year inside the bold is what we asked for; one just outside is what we
+  // often get. Either will do.
+  const year = innerYear ?? trailingYear;
 
   const cacheKey = `${normalise(title)}|${year ?? ""}`;
   const remembered = seen.get(cacheKey);
@@ -103,8 +195,9 @@ async function linkFor(span: string, seen: Map<string, string>) {
  * titles for links as they go past.
  *
  * It has to hold text back — you can't know a `**` is a title until its closing
- * `**` arrives — so it releases everything up to the first unclosed `**` and
- * keeps the rest until the span completes.
+ * `**` arrives, and you can't know whether a year follows until a few more
+ * characters do — so it releases everything up to the first `**` that is still
+ * undecided, and keeps the rest.
  */
 export class MovieLinkEnricher {
   private held = "";
@@ -114,6 +207,25 @@ export class MovieLinkEnricher {
   /** Add a chunk from the model; get back text ready for the browser. */
   async push(chunk: string): Promise<string> {
     this.held += chunk;
+    return await this.drain(false);
+  }
+
+  /** The stream ended: decide on whatever is left and release all of it. */
+  async finish(): Promise<string> {
+    const out = await this.drain(true);
+    const rest = this.held;
+    this.held = "";
+    // A span that never closed is just text — send it as written.
+    return out + rest;
+  }
+
+  /**
+   * Resolve every complete span we can, oldest first.
+   *
+   * `final` is the end of the stream: it means "stop waiting for more context,
+   * decide with what you have".
+   */
+  private async drain(final: boolean): Promise<string> {
     let out = "";
 
     for (;;) {
@@ -124,16 +236,37 @@ export class MovieLinkEnricher {
       // The span is still being written — wait for the rest.
       if (close === -1) break;
 
+      const after = this.held.slice(close + 2);
+      // We know where the title ends, but not yet whether "(1996)" follows it.
+      if (!final && after.length < LOOKAHEAD) break;
+
+      const span = this.held.slice(open, close + 2);
+      const trailer = readTrailer(after);
+
       out += this.held.slice(0, open);
-      out += await linkFor(this.held.slice(open, close + 2), this.seen);
-      this.held = this.held.slice(close + 2);
+
+      if (trailer.kind === "range") {
+        // "(2004–2012)" — a TV series. Leave the whole thing exactly as written.
+        out += span + after.slice(0, trailer.length);
+      } else {
+        const year = trailer.kind === "year" ? trailer.year : undefined;
+        const rendered = await linkFor(span, year, this.seen);
+        // When we linked, the label already ends in "(1996)", so the year the
+        // model wrote outside the bold is dropped rather than printed twice.
+        // When we didn't, nothing was consumed and the text stands as written.
+        out +=
+          rendered === span ? span + after.slice(0, trailer.length) : rendered;
+      }
+
+      this.held = after.slice(trailer.length);
     }
 
-    // Release everything except a possible unfinished span, keeping back a
-    // lone trailing `*` in case the second one is in the next chunk.
+    // Release everything except a span we haven't finished deciding about,
+    // keeping back a lone trailing `*` in case the second one is in the next
+    // chunk.
     const open = this.held.indexOf("**");
     if (open === -1) {
-      const keep = this.held.endsWith("*") ? 1 : 0;
+      const keep = !final && this.held.endsWith("*") ? 1 : 0;
       out += this.held.slice(0, this.held.length - keep);
       this.held = this.held.slice(this.held.length - keep);
     } else {
@@ -142,17 +275,5 @@ export class MovieLinkEnricher {
     }
 
     return out;
-  }
-
-  /** The stream ended: release whatever is left, span or not. */
-  async finish(): Promise<string> {
-    const rest = this.held;
-    this.held = "";
-    if (!rest) return "";
-
-    // A span that never closed is just text — send it as written.
-    return rest.startsWith("**") && rest.endsWith("**") && rest.length > 4
-      ? await linkFor(rest, this.seen)
-      : rest;
   }
 }

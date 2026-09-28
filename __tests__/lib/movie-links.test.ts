@@ -104,15 +104,85 @@ describe("MovieLinkEnricher", () => {
   });
 
   it("doesn't go looking up bold text that isn't a film", async () => {
-    search.mockResolvedValue([]);
-
     expect(await streamThrough("**Note:** it is long.")).toBe(
       "**Note:** it is long.",
     );
+    // And never even asks. A label like this is not a near-miss to be rejected
+    // later — "Runtime:" really does match a 2019 film called Runtime.
+    expect(search).not.toHaveBeenCalled();
   });
 
   it("releases a bold span that never closes", async () => {
     // Truncated mid-title: the reader still gets the words.
     expect(await streamThrough("Try **Heat (199")).toBe("Try **Heat (199");
+  });
+});
+
+// Every case below is something the live model actually wrote during the audit
+// on 22 Sep 2026, and every one of them used to produce a link to the wrong
+// film. They are here so that can't come back.
+describe("MovieLinkEnricher — the audit regressions", () => {
+  it("never links a bullet-point label, however real the film behind it", async () => {
+    // "**Runtime:**" shipped a link to /movie/617761 — "Runtime" (2019).
+    for (const label of ["**Runtime:**", "**Box office:**", "**Director:**"]) {
+      expect(await streamThrough(`${label} about 170 minutes.`)).toBe(
+        `${label} about 170 minutes.`,
+      );
+    }
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("never links a whole bolded sentence", async () => {
+    // The cap is generous on purpose — "Dr. Strangelove or: How I Learned to
+    // Stop Worrying and Love the Bomb" is a real title, and a long one.
+    const shout =
+      "**I would genuinely rather not guess at this one, because I do not remember it well enough**";
+
+    expect(await streamThrough(shout)).toBe(shout);
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("reads a year written just outside the bold, and prints it only once", async () => {
+    search.mockResolvedValue([tmdbMovie(627, "Trainspotting", "1996-02-23")]);
+
+    // The model writes this constantly, however firmly it is asked not to.
+    expect(
+      await streamThrough("**Trainspotting** (1996) is his breakout."),
+    ).toBe("[Trainspotting (1996)](/movie/627) is his breakout.");
+  });
+
+  it("keeps the year it didn't use when the film can't be linked", async () => {
+    search.mockResolvedValue([]);
+
+    expect(await streamThrough("**The Wind of Kepler** (2019) is great.")).toBe(
+      "**The Wind of Kepler** (2019) is great.",
+    );
+  });
+
+  it("treats a range of years as a TV show and leaves it alone", async () => {
+    // "**House** (2004–2012)" is the series. Searching TMDB for "House" finds
+    // a 1977 Japanese horror film, which is what the chat used to link to.
+    search.mockResolvedValue([tmdbMovie(25623, "House", "1977-08-30")]);
+
+    expect(
+      await streamThrough("**House** (2004–2012) is a medical drama."),
+    ).toBe("**House** (2004–2012) is a medical drama.");
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("refuses a film whose year is nowhere near the one it was given", async () => {
+    // The model asked for House (1977) meaning the TV show. If the only match
+    // were the 1995 Heat, linking it would be a confident lie — so we don't.
+    search.mockResolvedValue([tmdbMovie(949, "Heat", "1995-12-15")]);
+
+    expect(await streamThrough("**Heat (1977)**")).toBe("**Heat (1977)**");
+  });
+
+  it("still forgives a one-year slip, and lets TMDB win", async () => {
+    // The behaviour above must not cost us this: it's the reason the enricher
+    // checks titles against TMDB at all.
+    expect(await streamThrough("**Heat (1996)**")).toBe(
+      "[Heat (1995)](/movie/949)",
+    );
   });
 });
