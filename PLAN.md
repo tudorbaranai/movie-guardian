@@ -162,6 +162,19 @@ AI in the nav bar that reads your seen / rated / watchlist rows and recommends f
 them, through Vercel AI Gateway. It is an _extra_, not the recommender: it does no
 vector maths and nothing below depends on it. Next, in order:
 
+0a. **Done (2026-09-23): the assistant was audited and made honest.** Ten trap
+questions to the live model, every claim checked against TMDB: it denied a real
+credit (Hugh Laurie in 101 Dalmatians), invented one (Ewan McGregor in Tron:
+Legacy), and was three years out of date about "most recent". Three separate
+faults, fixed separately — the **system prompt** rewritten (today's date, one
+exact phrase for uncertainty, no embellishment, bold means a film and only a
+film), the **link contract** tightened so a bolded label can't become a film
+link, and **facts fetched before the model answers** (the film page you're on,
+and films already linked in the chat). Still one model request per question.
+Reading the question and looking up whatever it mentions is the obvious next
+step and is deliberately **not** done yet: it needs entity extraction, and TMDB
+has no typo tolerance, so it is a piece of work in its own right.
+
 0. **Done (2026-09-18): the assistant works, and it's free.** One model request per
    question (tool calling off), film links resolved server-side against TMDB, and a
    `429` waited out rather than shown as an error. Paying — Vercel credits, a direct

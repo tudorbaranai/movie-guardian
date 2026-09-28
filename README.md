@@ -14,7 +14,7 @@ Three features:
    knowing what _you_ have watched, rated and saved.
 
 > Full roadmap and design decisions live in [PLAN.md](./PLAN.md).
-> _Last updated: 2026-09-18._
+> _Last updated: 2026-09-23._
 
 ---
 
@@ -104,6 +104,22 @@ Three features:
   - Every film it names is a **link to our own `/movie/[id]` page**.
   - **One request to the model per question**, which is what makes it usable on a
     free account limited to about five a minute.
+- [x] **Making the assistant honest (Sept 2026)** — after it was caught lying:
+  - An **audit** put ten trap questions to the live model and checked every answer
+    against TMDB. It denied that Hugh Laurie is in 101 Dalmatians (1996) — he plays
+    Jasper — invented a Tron: Legacy credit for Ewan McGregor, and named a
+    three-year-old film as Nolan's most recent. See
+    [Keeping it honest](#keeping-it-honest-the-audit-and-what-came-of-it).
+  - The **system prompt was rewritten**: it now knows today's date, has one exact
+    phrase to use when unsure, is told not to embellish or to agree just to be
+    agreeable, and keeps **bold for film titles only** (TV shows go in plain text).
+  - The **link contract was tightened** so a bolded label can never become a film
+    link again — `**Runtime:**` used to link to a 2019 film called _Runtime_.
+  - We now **look films up before the model answers**: the film page you opened the
+    chat from, and every film already linked in the conversation. Still exactly one
+    request to the model.
+  - `npm run probe` re-runs the ten trap questions against the live model whenever
+    you want a reality check.
 - [ ] Phase 2 — Similar movies (embeddings). Phase 3 — Recommender + quiz. Phase 4 — Social.
 
 ---
@@ -210,6 +226,7 @@ AI_REASONING_EFFORT=low                   # optional; ONLY for effort-capable mo
 | `npm run lint`       | ESLint with the Next.js rules                             |
 | `npm test`           | Vitest unit tests, once                                   |
 | `npm run test:watch` | Tests that re-run on every save (press `q` to stop)       |
+| `npm run probe`      | **By hand only** — asks the live AI ten trap questions    |
 | `npm run format`     | Prettier formats every file (`format:check` only reports) |
 
 **Pre-commit hook** (`.husky/pre-commit`): every `git commit` first runs lint-staged
@@ -358,8 +375,11 @@ movie-guardian/
 │  ├─ movie-tools.ts      # the 2 TMDB lookups the assistant may ask us to run
 │  ├─ text-tool-calls.ts  # copes with models that write tool calls as text
 │  ├─ movie-links.ts      # **bold titles** → links, resolved against TMDB
+│  ├─ chat-context.ts     # facts we look up BEFORE the model is asked
 │  └─ watch-history.ts    # your films → the paragraph the assistant reads
 ├─ __tests__/             # unit tests, same folders as the code (login/, lib/, api/…)
+├─ scripts/
+│  └─ probe-assistant.mjs # `npm run probe` — the ten trap questions, live
 ├─ .husky/pre-commit      # checks that run before every commit
 ├─ .claude/launch.json    # lets Claude Code start the dev server ("movie-site")
 ├─ vitest.config.mts      # test settings (+ vitest.setup.ts)
@@ -530,6 +550,70 @@ of how much they cost:
 3. **Vercel's BYOK** is the worst of both: their docs say _"To use BYOK, your team
    needs purchased AI Gateway credits"_, so you'd pay Vercel **and** the provider.
 
+#### Keeping it honest (the audit, and what came of it)
+
+On 22 Sep 2026 the assistant was caught telling a flat lie, so the whole feature
+was put through ten deliberately awkward questions — the live model, the real
+system prompt — and **every factual claim was checked against TMDB**. Three of
+ten answers were wrong, three were right but decorated with invention, and four
+held up. The interesting part is that these were **three separate faults**, and
+only one of them was the model's:
+
+1. **It had no facts.** It answers film questions from memory, and nothing on the
+   request path ever checks one. No wording in a prompt fixes that.
+2. **Our link contract was overloaded.** `**bold**` was asked to mean "this is a
+   film" while also being the obvious way to write a heading or a TV title, and
+   we searched TMDB for every bold span we saw. Real answers shipped links from
+   `**Runtime:**` to _Runtime (2019)_ and from `**House (1977)**` to a Japanese
+   horror film.
+3. **Some rules were unenforceable.** "Never invent a cast member" is a wish, not
+   a constraint — the model cannot tell invention from recall. "Say so if unsure"
+   is too vague to obey or to test.
+
+What changed, in the order it matters:
+
+- **`lib/movie-links.ts` got suspicious.** A bold span that ends in a colon, or
+  runs longer than a title plausibly can, is never looked up at all. A year is
+  read whether it sits inside the bold or just outside it, and it is printed
+  once, not twice. A _range_ of years (`(2004–2012)`) is read as a TV series and
+  never linked. And if the model gives a year that no matching film is within a
+  year of, we link nothing rather than link the wrong film.
+- **`buildSystemPrompt` was restructured** around the advice every prompting
+  guide agrees on: say what it is, say what it _cannot_ do, give it one
+  unambiguous fallback for "I don't know", and keep the output contract small
+  and free of contradictions. It is now told today's date (it has no clock, which
+  is why "most recent" answers were three years stale), to use the exact words
+  _"I'm not sure"_, to add nothing for colour, and that **bold is only ever a
+  film title**.
+- **`lib/chat-context.ts` is new.** Before the model is called, we fetch the
+  facts for the film page the chat was opened from and for every film already
+  linked earlier in the conversation — cast _with character names_, year,
+  runtime, director — and put them in the prompt marked as checked. Those ids
+  cost nothing to find: our own link enricher already resolved them against
+  TMDB. **It is still one request to the model per question.**
+
+##### What this deliberately does not do yet
+
+It does not read the question and go looking for whatever you asked about. That
+needs entity extraction, and it is a job of its own — the experiments are worth
+knowing before it is built:
+
+- You **cannot** just send the question to TMDB. `/search/multi` with the whole
+  sentence returns nothing; it is a title index, not a search engine.
+- TMDB has **no typo tolerance**: "ewan megregor" and "hugh lorie" return
+  nothing. Single words often rescue it ("ewan" → Ewan McGregor), but not always.
+- It knows **localised titles**: "101 dalmatieni" resolves with `language=ro-RO`.
+- Resolving **one** entity is often enough. We cannot resolve "doctor house", but
+  resolving "101 dalmatieni" gives a cast list with _Hugh Laurie as Jasper_ in
+  it, and the model cannot then deny it.
+
+##### What no amount of this will fix
+
+A true sentence with an invented detail stapled on. Asked about Bill Murray in
+_Zombieland_ it got the fact right and then placed the scene in Las Vegas; it is
+at his home in Beverly Hills. TMDB has no field for that. The prompt now tells it
+to stop embellishing, which helps and does not cure.
+
 #### Upgrading the assistant
 
 1. **Richer history.** We send bare titles. Storing genre and year on `user_movies`
@@ -592,15 +676,17 @@ is still in `components/` if we want to revisit this later with a real browser.
 
 > To pick up in a fresh chat, say: **"Read the README in movie-guardian and continue."**
 
-### Where things stand (2026-09-18)
+### Where things stand (2026-09-23)
 
 **Phases 0 and 1 are complete, verified, and live** at <https://movie-guardian.vercel.app>:
 search, movie pages, sign-up confirmed with an 8-digit email code, sign in, forgot password
 (with a code), change password (Account page), mark seen / watchlist, 1–10 ratings, My Movies.
-The **✨ movie assistant** is built and tested locally but needs `AI_GATEWAY_API_KEY`
-(local **and** on Vercel) before it can answer — see
-[The movie assistant](#the-movie-assistant-ai-chat).
-`npm run check` (79 tests) and
+The **✨ movie assistant** needs `AI_GATEWAY_API_KEY` (local **and** on Vercel) before it
+can answer — see [The movie assistant](#the-movie-assistant-ai-chat). It was **audited and
+hardened on 2026-09-23** after being caught inventing facts; those changes are unit-tested
+but have **not yet been judged by a person** in the real chat window, which is the next
+thing to do.
+`npm run check` (180 tests) and
 the production build pass, `npm audit` reports 0 vulnerabilities, and the findings of the QA
 pass (desktop + phone, signed out and signed in) are fixed and live.
 
@@ -617,6 +703,12 @@ Done on 2026-09-15: live sign-up test, QA fix batch, Confirm password, Forgot pa
 test-account cleanup, and **Change password** (Account page). The Windows PC update was
 dropped — that PC isn't used for now. The full plan behind the steps below is in PLAN.md.
 
+0. **Test the hardened assistant for real** (next thing to do). The changes of
+   2026-09-23 — new system prompt, stricter links, facts fetched before the model
+   answers — are covered by unit tests but have not yet been judged by a person in
+   the real chat window. Run `npm run probe` for the ten trap questions against the
+   live model, then use the chat normally and see whether the answers got better.
+
 1. ~~Buy AI Gateway credits.~~ **Decided 2026-09-18: stay free.** The assistant was
    tuned until it answers properly without paying, and it does — verified live: one
    request per question, ten recommendations with ten correct links, off-topic
@@ -625,8 +717,16 @@ dropped — that PC isn't used for now. The full plan behind the steps below is 
    If that ever becomes annoying, see
    [If you ever do decide to pay](#if-you-ever-do-decide-to-pay).
 
-2. **Try Change password for real** on localhost and live (the user types the passwords).
-3. **Phase 2 — "Similar movies"** (the first machine-learning step, free):
+2. ~~Try Change password for real.~~ **Done.**
+3. **Swap in a stronger model — bring your own key + Claude Opus** (planned next).
+   The free model is the floor under answer quality: it is small, and grounding
+   raises its accuracy without raising its intelligence. Note that Vercel's BYOK
+   needs purchased AI Gateway credits, so "bring your own key" there means paying
+   twice; going straight to the provider avoids that but loses the gateway's
+   budgets, fallbacks and unified logs. Either way the code change is small — the
+   model is one constant in `lib/ai.ts` — and `AI_TOOL_ROUNDS` can go back up once
+   requests are no longer rationed.
+4. **Phase 2 — "Similar movies"** (the first machine-learning step, free):
    1. Enable **`pgvector`** in Supabase and add a `movies` table with a vector column.
    2. A script pulls ~5–10k movies from TMDB (title, plot, genres, top cast, director).
    3. A free **pre-trained** embedding model turns each film into 384 numbers. Decide where it
@@ -634,14 +734,14 @@ dropped — that PC isn't used for now. The full plan behind the steps below is 
       (sentence-transformers) or Supabase's built-in **`gte-small`** (Edge Function).
    4. A database function returns the nearest movies; a **"Similar movies"** row on the movie
       page, next to TMDB's "If you liked this" row for comparison.
-4. **Taste vector + "Recommended for you"** — average of the vectors of films you rated
+5. **Taste vector + "Recommended for you"** — average of the vectors of films you rated
    highly; nearest unseen films.
-5. **Learning loop without AI** — one short, skippable question after rating (question bank),
+6. **Learning loop without AI** — one short, skippable question after rating (question bank),
    answers become preference scores; a **"Your taste"** page to see/edit/delete them.
-6. **AI-written questions + answer analysis** via an AI gateway (small cost, spending cap, key
+7. **AI-written questions + answer analysis** via an AI gateway (small cost, spending cap, key
    only on the server).
-7. **"Because…" explanations** written once by an AI and saved.
-8. _Later, only when needed:_
+8. **"Because…" explanations** written once by an AI and saved.
+9. _Later, only when needed:_
    - **Custom domain + a transactional email service** (e.g. Resend) — worth it once the site
      is shared beyond a few friends, codes start landing in spam, or Gmail's daily sending
      limit gets close. Not needed during early development.
