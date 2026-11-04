@@ -1,0 +1,17 @@
+# Opens pull requests when dependencies have updates. Monthly and grouped,
+# so it is at most a couple of pull requests a month, each checked by CI.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

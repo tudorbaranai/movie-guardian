@@ -1,0 +1,24 @@
+# Runs the same checks as the pre-commit hook on every push and pull request:
+# formatting, lint, type check and unit tests. Tests mock Supabase and TMDB,
+# so no secrets are needed here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
