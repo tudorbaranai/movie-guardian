@@ -1,0 +1,7 @@
+# Store and check out text files with LF line endings on every machine.
+# Without this, Windows checkouts get CRLF and `npm run format:check` fails.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
