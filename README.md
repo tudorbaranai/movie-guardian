@@ -23,7 +23,7 @@ I wanted recommendations that start from my own history: the films I rated 9, th
 
 ## How the movie assistant works
 
-```
+```text
 browser                        /api/chat (server)                 Vercel AI Gateway
 -------                        ------------------                 -----------------
 the chat so far     ------>    1. who are you? (Supabase)
