@@ -1,6 +1,11 @@
 {
   "name": "movie-guardian",
   "version": "0.1.0",
+  "description": "A movie tracker for me and a few close friends, with a chat assistant that reads your ratings before it recommends",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tudorbaranai/movie-guardian.git"
+  },
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
